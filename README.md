@@ -4,6 +4,10 @@
 
 - [Course book](https://robot-dreams-rust.mag.wiki)
 
+## Homework
+
+See [tags](https://github.com/tmscer/rust-course/tags) with prefix "hw-".
+
 ## Setup
 
 See [`.vscode/settings.json`](./.vscode/settings.json).
