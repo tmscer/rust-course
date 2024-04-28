@@ -25,6 +25,8 @@ fn get_text_transmutation(name: &str) -> anyhow::Result<impl Fn(&str) -> String>
         "uppercase" => |s: &str| s.to_uppercase(),
         "no-spaces" => |s: &str| s.replace(' ', ""),
         "slugify" => |s: &str| slug::slugify(s),
+        "reverse" => |s: &str| s.chars().rev().collect(),
+        "no-whitespace" => |s: &str| s.chars().filter(|c| !c.is_whitespace()).collect(),
         _ => return Err(anyhow::Error::msg("Unknown text transmutation")),
     };
 
