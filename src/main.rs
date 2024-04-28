@@ -27,6 +27,18 @@ fn get_text_transmutation(name: &str) -> anyhow::Result<impl Fn(&str) -> String>
         "slugify" => |s: &str| slug::slugify(s),
         "reverse" => |s: &str| s.chars().rev().collect(),
         "no-whitespace" => |s: &str| s.chars().filter(|c| !c.is_whitespace()).collect(),
+        #[cfg(feature = "random")]
+        "spongebob" => |s: &str| {
+            s.chars()
+                .map(|c| {
+                    if rand::random() {
+                        c.to_ascii_uppercase()
+                    } else {
+                        c.to_ascii_lowercase()
+                    }
+                })
+                .collect()
+        },
         _ => return Err(anyhow::Error::msg("Unknown text transmutation")),
     };
 

@@ -7,4 +7,10 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.82"
+rand = {version = "0.8.5", optional = true}
 slug = "0.1.5"
+
+[features]
+default = ["random"]
+
+random = ["dep:rand"]
