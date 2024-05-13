@@ -1,5 +1,7 @@
 use std::{env, process::ExitCode};
 
+mod simple_ops;
+
 fn main() -> anyhow::Result<ExitCode> {
     let mut args = env::args().take(2);
 
@@ -21,24 +23,14 @@ fn main() -> anyhow::Result<ExitCode> {
 
 fn get_text_transmutation(name: &str) -> anyhow::Result<impl Fn(&str) -> String> {
     let func = match name {
-        "lowercase" => |s: &str| s.to_lowercase(),
-        "uppercase" => |s: &str| s.to_uppercase(),
-        "no-spaces" => |s: &str| s.replace(' ', ""),
-        "slugify" => |s: &str| slug::slugify(s),
-        "reverse" => |s: &str| s.chars().rev().collect(),
-        "no-whitespace" => |s: &str| s.chars().filter(|c| !c.is_whitespace()).collect(),
+        "lowercase" => simple_ops::lowercase,
+        "uppercase" => simple_ops::uppercase,
+        "no-spaces" => simple_ops::no_spaces,
+        "slugify" => simple_ops::slugify,
+        "reverse" => simple_ops::reverse,
+        "no-whitespace" => simple_ops::no_whitespace,
         #[cfg(feature = "random")]
-        "spongebob" => |s: &str| {
-            s.chars()
-                .map(|c| {
-                    if rand::random() {
-                        c.to_ascii_uppercase()
-                    } else {
-                        c.to_ascii_lowercase()
-                    }
-                })
-                .collect()
-        },
+        "spongebob" => simple_ops::spongebob,
         _ => return Err(anyhow::Error::msg("Unknown text transmutation")),
     };
 
