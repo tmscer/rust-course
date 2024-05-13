@@ -50,7 +50,7 @@ fn get_text_transmutation<R: io::BufRead>(
         "slugify" => simple_ops::slugify,
         "reverse" => simple_ops::reverse,
         "no-whitespace" => simple_ops::no_whitespace,
-        #[cfg(feature = "random")]
+        #[cfg(feature = "spongebob")]
         "spongebob" => simple_ops::spongebob,
         _ => return Err(anyhow::Error::msg("Unknown text transmutation")),
     };

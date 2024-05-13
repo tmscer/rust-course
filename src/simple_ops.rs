@@ -22,7 +22,7 @@ pub fn no_whitespace(s: &str) -> String {
     s.chars().filter(|c| !c.is_whitespace()).collect()
 }
 
-#[cfg(feature = "random")]
+#[cfg(feature = "spongebob")]
 pub fn spongebob(s: &str) -> String {
     s.chars()
         .map(|c| {

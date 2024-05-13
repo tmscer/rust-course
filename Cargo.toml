@@ -11,6 +11,6 @@ rand = {version = "0.8.5", optional = true}
 slug = "0.1.5"
 
 [features]
-default = ["random"]
+default = ["spongebob"]
 
-random = ["dep:rand"]
+spongebob = ["dep:rand"]
