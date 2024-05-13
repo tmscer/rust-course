@@ -1,5 +1,6 @@
 use std::{env, io, process::ExitCode};
 
+mod file_format_ops;
 mod simple_ops;
 
 pub trait Operation<R: io::BufRead>: Fn(R) -> anyhow::Result<String> {}
@@ -40,9 +41,16 @@ where
     }
 }
 
-fn get_text_transmutation<R: io::BufRead>(
+// Boxing should be ok since the function isn't expected to be called many times.
+fn get_text_transmutation<R: io::BufRead + 'static>(
     name: &str,
-) -> anyhow::Result<impl Fn(R) -> anyhow::Result<String>> {
+) -> anyhow::Result<Box<dyn Fn(R) -> anyhow::Result<String>>> {
+    match name {
+        #[cfg(feature = "csv")]
+        "csv" => return Ok(Box::new(file_format_ops::csv::<R>)),
+        _ => {}
+    }
+
     let func = match name {
         "lowercase" => simple_ops::lowercase,
         "uppercase" => simple_ops::uppercase,
@@ -55,5 +63,5 @@ fn get_text_transmutation<R: io::BufRead>(
         _ => return Err(anyhow::Error::msg("Unknown text transmutation")),
     };
 
-    Ok(read_into_str_op(func))
+    Ok(Box::new(read_into_str_op(func)))
 }
