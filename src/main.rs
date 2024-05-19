@@ -1,4 +1,4 @@
-use std::{io, process::ExitCode, str::FromStr, thread};
+use std::{env, io, process::ExitCode, str::FromStr, thread};
 
 mod cmd;
 mod file_format_ops;
@@ -8,10 +8,14 @@ fn main() -> anyhow::Result<ExitCode> {
     let (cmd_tx, cmd_rx) = std::sync::mpsc::channel::<cmd::Command>();
 
     let input_thread = thread::spawn(move || {
-        use io::BufRead;
+        let stdin = io::stdin().lock();
+        let input = if let Some(op) = env::args().nth(1) {
+            Input::OpAndReader(op, stdin)
+        } else {
+            Input::Reader(stdin)
+        };
 
-        let input = std::io::stdin().lock().lines();
-        read_input(input, cmd_tx)
+        input.send_commands(cmd_tx)
     });
 
     // Processing thread shall end when the command channel is closed.
@@ -32,28 +36,50 @@ fn main() -> anyhow::Result<ExitCode> {
     Ok(ExitCode::SUCCESS)
 }
 
-fn read_input<R>(
-    lines: io::Lines<R>,
-    cmd_tx: std::sync::mpsc::Sender<cmd::Command>,
-) -> anyhow::Result<usize>
-where
-    R: io::BufRead,
-{
-    let mut num_errors = 0;
+enum Input<R: io::BufRead> {
+    Reader(R),
+    OpAndReader(String, R),
+}
 
-    for line in lines {
-        let line = line?;
+impl<R: io::BufRead> Input<R> {
+    pub fn send_commands(
+        self,
+        cmd_tx: std::sync::mpsc::Sender<cmd::Command>,
+    ) -> anyhow::Result<usize> {
+        let cmd_iter: Box<dyn Iterator<Item = anyhow::Result<cmd::Command>>> = match self {
+            Self::Reader(reader) => {
+                let iter = reader.lines().map(|line_result| {
+                    line_result
+                        .map_err(anyhow::Error::from)
+                        .and_then(|line| cmd::Command::from_str(&line))
+                });
 
-        match cmd::Command::from_str(&line) {
-            Ok(cmd) => cmd_tx.send(cmd)?,
-            Err(err) => {
-                num_errors += 1;
-                eprintln!("Input error: {err}");
+                Box::new(iter)
+            }
+            Self::OpAndReader(op, reader) => {
+                let cmd_result = cmd::Command::from_op_name_and_input(&op, reader);
+                let iter = std::iter::once(cmd_result);
+
+                Box::new(iter)
+            }
+        };
+
+        let mut num_errors = 0;
+
+        for cmd_result in cmd_iter {
+            match cmd_result {
+                Ok(cmd) => {
+                    cmd_tx.send(cmd)?;
+                }
+                Err(err) => {
+                    num_errors += 1;
+                    eprintln!("Error: {err}");
+                }
             }
         }
-    }
 
-    Ok(num_errors)
+        Ok(num_errors)
+    }
 }
 
 fn process_commands(cmd_rx: impl Iterator<Item = cmd::Command>) -> anyhow::Result<usize> {

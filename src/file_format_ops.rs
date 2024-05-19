@@ -1,4 +1,4 @@
-use std::{fmt, io, path, str::FromStr};
+use std::{fmt, io, str::FromStr};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FileOp {
@@ -17,9 +17,7 @@ impl FromStr for FileOp {
 }
 
 impl FileOp {
-    pub fn exec(self, path: path::PathBuf) -> anyhow::Result<String> {
-        let reader = io::BufReader::new(std::fs::File::open(path)?);
-
+    pub fn exec<R: io::BufRead>(self, reader: R) -> anyhow::Result<String> {
         match self {
             Self::Csv => csv(reader),
         }
