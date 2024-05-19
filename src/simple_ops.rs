@@ -1,3 +1,50 @@
+use std::str::FromStr;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SimpleOp {
+    Lowercase,
+    Uppercase,
+    NoSpaces,
+    Slugify,
+    Reverse,
+    NoWhitespace,
+    #[cfg(feature = "spongebob")]
+    Spongebob,
+}
+
+impl FromStr for SimpleOp {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "lowercase" => Ok(Self::Lowercase),
+            "uppercase" => Ok(Self::Uppercase),
+            "no_spaces" => Ok(Self::NoSpaces),
+            "slugify" => Ok(Self::Slugify),
+            "reverse" => Ok(Self::Reverse),
+            "no_whitespace" => Ok(Self::NoWhitespace),
+            #[cfg(feature = "spongebob")]
+            "spongebob" => Ok(Self::Spongebob),
+            _ => Err(anyhow::Error::msg(format!("Unknown operation: {s}"))),
+        }
+    }
+}
+
+impl SimpleOp {
+    pub fn exec(self, s: &str) -> String {
+        match self {
+            Self::Lowercase => lowercase(s),
+            Self::Uppercase => uppercase(s),
+            Self::NoSpaces => no_spaces(s),
+            Self::Slugify => slugify(s),
+            Self::Reverse => reverse(s),
+            Self::NoWhitespace => no_whitespace(s),
+            #[cfg(feature = "spongebob")]
+            Self::Spongebob => spongebob(s),
+        }
+    }
+}
+
 pub fn lowercase(s: &str) -> String {
     s.to_lowercase()
 }

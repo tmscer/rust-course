@@ -1,4 +1,30 @@
-use std::{fmt, io};
+use std::{fmt, io, path, str::FromStr};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FileOp {
+    Csv,
+}
+
+impl FromStr for FileOp {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "csv" => Ok(Self::Csv),
+            _ => Err(anyhow::Error::msg(format!("Unknown operation: {s}"))),
+        }
+    }
+}
+
+impl FileOp {
+    pub fn exec(self, path: path::PathBuf) -> anyhow::Result<String> {
+        let reader = io::BufReader::new(std::fs::File::open(path)?);
+
+        match self {
+            Self::Csv => csv(reader),
+        }
+    }
+}
 
 pub fn csv<R: io::BufRead>(reader: R) -> anyhow::Result<String> {
     let mut csv_reader = csv::Reader::from_reader(reader);

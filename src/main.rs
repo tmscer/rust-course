@@ -1,67 +1,73 @@
-use std::{env, io, process::ExitCode};
+use std::{io, process::ExitCode, str::FromStr, thread};
 
+mod cmd;
 mod file_format_ops;
 mod simple_ops;
 
-pub trait Operation<R: io::BufRead>: Fn(R) -> anyhow::Result<String> {}
-
 fn main() -> anyhow::Result<ExitCode> {
-    let mut args = env::args().take(2);
+    let (cmd_tx, cmd_rx) = std::sync::mpsc::channel::<cmd::Command>();
 
-    args.next().ok_or(anyhow::Error::msg("Missing 0th arg"))?;
-    let transmutation = args
-        .next()
-        .ok_or(anyhow::Error::msg("Missing transmutation arg"))?;
+    let input_thread = thread::spawn(move || {
+        use io::BufRead;
 
-    let transmute = get_text_transmutation::<io::StdinLock>(&transmutation)?;
-    let output = transmute(io::stdin().lock())?;
+        let input = std::io::stdin().lock().lines();
+        read_input(input, cmd_tx)
+    });
 
-    print!("{output}");
+    // Processing thread shall end when the command channel is closed.
+    let processing_thread = thread::spawn(move || process_commands(cmd_rx.iter()));
+
+    let num_input_errs = input_thread.join().expect("Failed to join input thread")?;
+    let num_processing_errs = processing_thread
+        .join()
+        .expect("Failed to join processing thread")?;
+
+    let num_errs = num_input_errs + num_processing_errs;
+
+    if num_errs > 0 {
+        eprintln!("Encountered one or more errors");
+        return Ok(ExitCode::FAILURE);
+    }
 
     Ok(ExitCode::SUCCESS)
 }
 
-fn read_into_str_op<R, F>(func: F) -> impl Fn(R) -> anyhow::Result<String>
+fn read_input<R>(
+    lines: io::Lines<R>,
+    cmd_tx: std::sync::mpsc::Sender<cmd::Command>,
+) -> anyhow::Result<usize>
 where
     R: io::BufRead,
-    F: Fn(&str) -> String,
 {
-    move |reader: R| -> anyhow::Result<String> {
-        let mut result = String::new();
+    let mut num_errors = 0;
 
-        for line in reader.lines() {
-            let line = line?;
-            let transmutated_line = func(&line);
+    for line in lines {
+        let line = line?;
 
-            result.push_str(&transmutated_line);
-            result.push('\n');
+        match cmd::Command::from_str(&line) {
+            Ok(cmd) => cmd_tx.send(cmd)?,
+            Err(err) => {
+                num_errors += 1;
+                eprintln!("Input error: {err}");
+            }
         }
-
-        Ok(result)
     }
+
+    Ok(num_errors)
 }
 
-// Boxing should be ok since the function isn't expected to be called many times.
-fn get_text_transmutation<R: io::BufRead + 'static>(
-    name: &str,
-) -> anyhow::Result<Box<dyn Fn(R) -> anyhow::Result<String>>> {
-    match name {
-        #[cfg(feature = "csv")]
-        "csv" => return Ok(Box::new(file_format_ops::csv::<R>)),
-        _ => {}
+fn process_commands(cmd_rx: impl Iterator<Item = cmd::Command>) -> anyhow::Result<usize> {
+    let mut num_errors = 0;
+
+    for cmd in cmd_rx {
+        match cmd.exec() {
+            Ok(output) => print!("{output}"),
+            Err(err) => {
+                num_errors += 1;
+                eprintln!("Processing error: {err}");
+            }
+        }
     }
 
-    let func = match name {
-        "lowercase" => simple_ops::lowercase,
-        "uppercase" => simple_ops::uppercase,
-        "no-spaces" => simple_ops::no_spaces,
-        "slugify" => simple_ops::slugify,
-        "reverse" => simple_ops::reverse,
-        "no-whitespace" => simple_ops::no_whitespace,
-        #[cfg(feature = "spongebob")]
-        "spongebob" => simple_ops::spongebob,
-        _ => return Err(anyhow::Error::msg("Unknown text transmutation")),
-    };
-
-    Ok(Box::new(read_into_str_op(func)))
+    Ok(num_errors)
 }
