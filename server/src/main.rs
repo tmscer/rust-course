@@ -1,9 +1,4 @@
-use std::{
-    collections::HashMap,
-    fs,
-    io::{Read, Write},
-    net, path,
-};
+use std::{collections::HashMap, fs, io::Write, net, path};
 
 use clap::Parser;
 
@@ -45,7 +40,7 @@ fn main() -> anyhow::Result<()> {
             tracing::info!("Handling connection from {client_addr}");
 
             loop {
-                match read_message(&mut client_stream) {
+                match common::proto::Message::read_from(&mut client_stream) {
                     // If we failed to execute a valid message, propagate error further
                     Ok(msg) => execute_message(msg, &client_addr)?,
                     Err(err) => {
@@ -66,8 +61,11 @@ fn main() -> anyhow::Result<()> {
 }
 
 #[tracing::instrument(skip(msg))]
-fn execute_message(msg: common::Message, client_addr: &net::SocketAddr) -> anyhow::Result<()> {
-    use common::Message;
+fn execute_message(
+    msg: common::proto::Message,
+    client_addr: &net::SocketAddr,
+) -> anyhow::Result<()> {
+    use common::proto::Message;
 
     tracing::debug!("Handling message");
 
@@ -109,26 +107,4 @@ fn receive_file(filepath: &path::Path, data: &[u8]) -> anyhow::Result<()> {
     file.write_all(data)?;
 
     Ok(())
-}
-
-#[tracing::instrument]
-fn read_message(client_stream: &mut net::TcpStream) -> anyhow::Result<common::Message> {
-    tracing::debug!("Waiting for length of message");
-
-    let mut len_bytes = [0u8; std::mem::size_of::<common::Len>()];
-    client_stream.read_exact(&mut len_bytes)?;
-
-    let len: usize = common::Len::from_be_bytes(len_bytes).try_into()?;
-    tracing::debug!("Got length of message {len} bytes");
-
-    let mut message_bytes = vec![0u8; len];
-
-    client_stream.read_exact(&mut message_bytes)?;
-
-    tracing::debug!(
-        "Received message of {} bytes (excluding length)",
-        message_bytes.len()
-    );
-
-    serde_cbor::from_slice(&message_bytes).map_err(anyhow::Error::from)
 }

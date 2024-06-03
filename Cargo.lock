@@ -110,8 +110,6 @@ dependencies = [
  "anyhow",
  "clap",
  "common",
- "serde",
- "serde_cbor",
  "thiserror",
  "tracing",
 ]
@@ -252,8 +250,6 @@ dependencies = [
  "anyhow",
  "clap",
  "common",
- "serde",
- "serde_cbor",
  "thiserror",
  "tracing",
 ]

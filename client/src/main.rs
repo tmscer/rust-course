@@ -1,8 +1,4 @@
-use std::{
-    fs,
-    io::{self, Write},
-    net, path,
-};
+use std::{fs, io, net, path};
 
 use clap::Parser;
 
@@ -53,7 +49,7 @@ fn handle_command_should_exit(
             let basename = extract_basename(&filepath).map_err(Error::hard)?;
             let contents = fs::read(filepath).map_err(Error::soft)?;
 
-            common::Message::File(basename, contents)
+            common::proto::Message::File(basename, contents)
         }
         Command::Image(filepath) => {
             let basename = extract_basename(&filepath).map_err(Error::hard)?;
@@ -66,18 +62,12 @@ fn handle_command_should_exit(
 
             let contents = fs::read(filepath).map_err(Error::soft)?;
 
-            common::Message::File(basename, contents)
+            common::proto::Message::File(basename, contents)
         }
-        Command::Message(msg) => common::Message::Text(msg),
+        Command::Message(msg) => common::proto::Message::Text(msg),
     };
 
-    let payload = serde_cbor::to_vec(&message).map_err(Error::hard)?;
-    let len: common::Len = payload.len().try_into().map_err(Error::hard)?;
-
-    conn.write_all(&len.to_be_bytes()).map_err(Error::hard)?;
-    conn.write_all(&payload).map_err(Error::hard)?;
-
-    let bytes_sent = std::mem::size_of::<common::Len>() + payload.len();
+    let bytes_sent = message.write_to(conn).map_err(Error::hard)?;
     tracing::debug!("Sent {bytes_sent} bytes");
 
     Ok(false)
