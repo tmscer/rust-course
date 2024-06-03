@@ -5,13 +5,14 @@ use std::{
     net, path,
 };
 
+use clap::Parser;
+
 fn main() -> anyhow::Result<()> {
     common::tracing::init()?;
 
-    let server_addr = common::get_server_addr(std::env::args().nth(1).as_deref())?;
-
-    let listener = net::TcpListener::bind(server_addr)?;
-    tracing::info!("Listening on {server_addr}");
+    let args = common::cli::Args::parse();
+    let listener = net::TcpListener::bind(args.server_address)?;
+    tracing::info!("Listening on {}", args.server_address);
 
     let mut clients =
         HashMap::<net::SocketAddr, std::thread::JoinHandle<anyhow::Result<()>>>::new();

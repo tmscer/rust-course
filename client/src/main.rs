@@ -4,13 +4,15 @@ use std::{
     net, path,
 };
 
+use clap::Parser;
+
 fn main() -> anyhow::Result<()> {
     common::tracing::init()?;
 
-    let server_addr = common::get_server_addr(std::env::args().nth(1).as_deref())?;
-    let mut conn = net::TcpStream::connect(server_addr)?;
+    let args = common::cli::Args::parse();
+    let mut conn = net::TcpStream::connect(args.server_address)?;
 
-    tracing::info!("Connected to {server_addr}");
+    tracing::info!("Connected to {}", args.server_address);
 
     let iter_cmds = read_commands(io::stdin().lock());
     let iter_cmd_results = iter_cmds.map(|cmd| handle_command_should_exit(&mut conn, cmd));

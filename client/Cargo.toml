@@ -7,6 +7,7 @@ version = "0.1.0"
 common = {path = "../common"}
 
 anyhow = {workspace = true}
+clap = {workspace = true}
 serde = {workspace = true}
 serde_cbor = {workspace = true}
 thiserror = {workspace = true}
