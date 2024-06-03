@@ -62,12 +62,11 @@ impl Message {
 
 #[cfg(test)]
 mod tests {
+    use proptest::proptest;
+
     use super::*;
 
-    #[test]
-    fn test_write_and_read() {
-        let input_msg = Message::Text("hello!!!!".to_string());
-
+    fn assert_roundtrip_succeeds(input_msg: Message) {
         let mut wire = vec![];
         input_msg.write_to(&mut wire).unwrap();
 
@@ -75,5 +74,29 @@ mod tests {
         let output_msg = Message::read_from(&mut cursor).unwrap();
 
         assert_eq!(output_msg, input_msg);
+    }
+
+    #[test]
+    fn test_basic_roundtrip() {
+        let input_msg = Message::Text("hello!!!!".to_string());
+
+        assert_roundtrip_succeeds(input_msg);
+    }
+
+    proptest! {
+        #[test]
+        fn test_message_roundtrip(text in ".*") {
+            assert_roundtrip_succeeds(Message::Text(text));
+        }
+
+       #[test]
+        fn test_file_roundtrip(filename in ".+", payload in proptest::arbitrary::any::<Vec<u8>>()) {
+            assert_roundtrip_succeeds(Message::File(filename, payload));
+        }
+
+        #[test]
+        fn test_image_roundtrip(filename in ".+", payload in proptest::arbitrary::any::<Vec<u8>>()) {
+            assert_roundtrip_succeeds(Message::Image(filename, payload));
+        }
     }
 }
