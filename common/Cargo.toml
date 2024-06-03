@@ -1,0 +1,10 @@
+[package]
+edition = "2021"
+name = "common"
+version = "0.1.0"
+
+[dependencies]
+anyhow = {workspace = true}
+serde = {workspace = true}
+serde_cbor = {workspace = true}
+thiserror = {workspace = true}

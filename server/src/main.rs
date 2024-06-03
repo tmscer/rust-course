@@ -6,7 +6,7 @@ use std::{
 };
 
 fn main() -> anyhow::Result<()> {
-    let server_addr = rust_course::get_server_addr(std::env::args().nth(1).as_deref())?;
+    let server_addr = common::get_server_addr(std::env::args().nth(1).as_deref())?;
 
     let listener = net::TcpListener::bind(server_addr)?;
     eprintln!("Listening on {server_addr}");
@@ -62,8 +62,8 @@ fn main() -> anyhow::Result<()> {
     }
 }
 
-fn execute_message(msg: rust_course::Message, client_addr: &net::SocketAddr) -> anyhow::Result<()> {
-    use rust_course::Message;
+fn execute_message(msg: common::Message, client_addr: &net::SocketAddr) -> anyhow::Result<()> {
+    use common::Message;
 
     match msg {
         Message::File(filename, data) => {
@@ -101,11 +101,11 @@ fn receive_file(filepath: &path::Path, data: &[u8]) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn read_message(client_stream: &mut net::TcpStream) -> anyhow::Result<rust_course::Message> {
-    let mut len_bytes = [0u8; std::mem::size_of::<rust_course::Len>()];
+fn read_message(client_stream: &mut net::TcpStream) -> anyhow::Result<common::Message> {
+    let mut len_bytes = [0u8; std::mem::size_of::<common::Len>()];
     client_stream.read_exact(&mut len_bytes)?;
 
-    let len: usize = rust_course::Len::from_be_bytes(len_bytes).try_into()?;
+    let len: usize = common::Len::from_be_bytes(len_bytes).try_into()?;
     let mut message_bytes = vec![0u8; len];
 
     client_stream.read_exact(&mut message_bytes)?;

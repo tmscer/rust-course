@@ -6,7 +6,7 @@ use std::{
 
 // TODO: Revise stdout/stderr
 fn main() -> anyhow::Result<()> {
-    let server_addr = rust_course::get_server_addr(std::env::args().nth(1).as_deref())?;
+    let server_addr = common::get_server_addr(std::env::args().nth(1).as_deref())?;
     let mut conn = net::TcpStream::connect(server_addr)?;
 
     eprintln!("Connected to {server_addr}");
@@ -50,7 +50,7 @@ fn handle_command_should_exit(
             let basename = extract_basename(&filepath).map_err(Error::hard)?;
             let contents = fs::read(filepath).map_err(Error::soft)?;
 
-            rust_course::Message::File(basename, contents)
+            common::Message::File(basename, contents)
         }
         Command::Image(filepath) => {
             let basename = extract_basename(&filepath).map_err(Error::hard)?;
@@ -63,18 +63,18 @@ fn handle_command_should_exit(
 
             let contents = fs::read(filepath).map_err(Error::soft)?;
 
-            rust_course::Message::File(basename, contents)
+            common::Message::File(basename, contents)
         }
-        Command::Message(msg) => rust_course::Message::Text(msg),
+        Command::Message(msg) => common::Message::Text(msg),
     };
 
     let payload = serde_cbor::to_vec(&message).map_err(Error::hard)?;
-    let len: rust_course::Len = payload.len().try_into().map_err(Error::hard)?;
+    let len: common::Len = payload.len().try_into().map_err(Error::hard)?;
 
     conn.write_all(&len.to_be_bytes()).map_err(Error::hard)?;
     conn.write_all(&payload).map_err(Error::hard)?;
 
-    let bytes_sent = std::mem::size_of::<rust_course::Len>() + payload.len();
+    let bytes_sent = std::mem::size_of::<common::Len>() + payload.len();
     eprintln!("Sent {bytes_sent} bytes");
 
     Ok(false)

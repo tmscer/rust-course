@@ -1,0 +1,12 @@
+[package]
+edition = "2021"
+name = "server"
+version = "0.1.0"
+
+[dependencies]
+common = {path = "../common"}
+
+anyhow = {workspace = true}
+serde = {workspace = true}
+serde_cbor = {workspace = true}
+thiserror = {workspace = true}

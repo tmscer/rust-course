@@ -1,5 +1,51 @@
 # Rust Course
 
+## Client-Server Application
+
+This project contains a client-server application for sending messages and files.
+See individual crates
+
+- common (lib),
+- client (bin),
+- server (bin),
+
+for details.
+
+### Common
+
+Defines protocol for sending messages and files and how to write/read to/from network, CLI arguments
+and other utilities used by both `client` and `server`.
+
+### Client
+
+To run the client do the following in its directory:
+
+```console
+./client $ cargo run -- <server-address>
+```
+
+where `server-address` is in format `ip:port`, default is `localhost:11111`.
+
+Commands are read from stdin and sent to the server. They have the following syntax:
+
+```
+.file <file-path>  # send file
+.image <file-path> # send image
+<anything else>    # send text message
+```
+
+### Server
+
+To run the server do the following in its directory:
+
+```console
+./server $ cargo run -- <server-address>
+```
+
+where `server-address` is in format `ip:port`, default is `localhost:11111`.
+
+Server handles connection on the main thread and spawns a new thread for each client.
+
 ## Links
 
 - [Course book](https://robot-dreams-rust.mag.wiki)
