@@ -42,12 +42,11 @@ Commands are read from stdin and sent to the server. They have the following syn
 To run the server do the following in its directory:
 
 ```console
-./server $ cargo run -- <server-address>
+./server $ cargo run -- <server-address> --root <root-dir>
 ```
 
-where `server-address` is in format `ip:port`, default is `localhost:11111`.
-
-Directories `./files` and `./images` are created if they don't exist.
+Files are saved in `<root-dir>/files` and images are saved in `<root-dir>/images`.
+Directories `<root-dir>/files` and `<root-dir>/images` are created if they don't exist.
 
 Server handles connection on the main thread and spawns a new thread for each client.
 
