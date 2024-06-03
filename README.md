@@ -21,13 +21,17 @@ One thing to note is that files are read into memory and sent as a whole, so it'
 
 ### Client
 
-To run the client do the following in its directory:
+Use `cargo run -- --help` to see usage:
 
 ```console
-./client $ cargo run -- <server-address>
-```
+Usage: client [SERVER_ADDRESS]
 
-where `server-address` is in format `ip:port`, default is `localhost:11111`.
+Arguments:
+  [SERVER_ADDRESS]  [default: 127.0.0.1:11111]
+
+Options:
+  -h, --help  Print help
+```
 
 Commands are read from stdin and sent to the server. They have the following syntax:
 
@@ -39,10 +43,17 @@ Commands are read from stdin and sent to the server. They have the following syn
 
 ### Server
 
-To run the server do the following in its directory:
+Use `cargo run -- --help` to see usage:
 
 ```console
-./server $ cargo run -- <server-address> --root <root-dir>
+Usage: server [OPTIONS] [SERVER_ADDRESS]
+
+Arguments:
+  [SERVER_ADDRESS]  [default: 127.0.0.1:11111]
+
+Options:
+  -r, --root <ROOT>  [default: .]
+  -h, --help         Print help
 ```
 
 Files are saved in `<root-dir>/files` and images are saved in `<root-dir>/images`.
