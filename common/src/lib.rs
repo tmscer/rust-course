@@ -1,5 +1,7 @@
 use std::{net, str::FromStr};
 
+pub mod tracing;
+
 pub const DEFAULT_SERVER_ADDR: net::SocketAddrV4 =
     net::SocketAddrV4::new(net::Ipv4Addr::LOCALHOST, 11_111);
 pub type Len = u64;

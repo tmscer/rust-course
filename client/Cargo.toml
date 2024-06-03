@@ -10,3 +10,4 @@ anyhow = {workspace = true}
 serde = {workspace = true}
 serde_cbor = {workspace = true}
 thiserror = {workspace = true}
+tracing = {workspace = true}

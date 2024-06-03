@@ -4,12 +4,13 @@ use std::{
     net, path,
 };
 
-// TODO: Revise stdout/stderr
 fn main() -> anyhow::Result<()> {
+    common::tracing::init()?;
+
     let server_addr = common::get_server_addr(std::env::args().nth(1).as_deref())?;
     let mut conn = net::TcpStream::connect(server_addr)?;
 
-    eprintln!("Connected to {server_addr}");
+    tracing::info!("Connected to {server_addr}");
 
     let iter_cmds = read_commands(io::stdin().lock());
     let iter_cmd_results = iter_cmds.map(|cmd| handle_command_should_exit(&mut conn, cmd));
@@ -17,16 +18,17 @@ fn main() -> anyhow::Result<()> {
     for cmd_result in iter_cmd_results {
         match cmd_result {
             Ok(true) => {
+                tracing::info!("Exiting...");
                 break;
             }
             Ok(false) => {
-                eprintln!("Command execution finished");
+                tracing::info!("Command execution finished");
             }
             Err(Error::Soft(err)) => {
-                eprintln!("Non-fatal error: {err}");
+                tracing::warn!("Non-fatal error: {err}");
             }
             Err(Error::Hard(err)) => {
-                eprintln!("Exiting due to: {err}");
+                tracing::error!("Exiting due to: {err}");
                 return Err(err);
             }
         }
@@ -43,7 +45,6 @@ fn handle_command_should_exit(
 
     let message = match cmd {
         Command::Quit => {
-            eprintln!("Exiting...");
             return Ok(true);
         }
         Command::File(filepath) => {
@@ -75,7 +76,7 @@ fn handle_command_should_exit(
     conn.write_all(&payload).map_err(Error::hard)?;
 
     let bytes_sent = std::mem::size_of::<common::Len>() + payload.len();
-    eprintln!("Sent {bytes_sent} bytes");
+    tracing::debug!("Sent {bytes_sent} bytes");
 
     Ok(false)
 }
