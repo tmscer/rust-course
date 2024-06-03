@@ -44,6 +44,8 @@ To run the server do the following in its directory:
 
 where `server-address` is in format `ip:port`, default is `localhost:11111`.
 
+Directories `./files` and `./images` are created if they don't exist.
+
 Server handles connection on the main thread and spawns a new thread for each client.
 
 ## Links

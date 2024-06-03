@@ -72,7 +72,9 @@ fn execute_message(msg: common::Message, client_addr: &net::SocketAddr) -> anyho
 
     match msg {
         Message::File(filename, data) => {
-            let filepath = path::Path::new("./files").join(&filename);
+            let root = path::Path::new("./files");
+            fs::create_dir(root)?;
+            let filepath = root.join(&filename);
             receive_file(&filepath, &data)?;
 
             tracing::info!(
@@ -82,7 +84,9 @@ fn execute_message(msg: common::Message, client_addr: &net::SocketAddr) -> anyho
             );
         }
         Message::Image(filename, data) => {
-            let filepath = path::Path::new("./images").join(&filename);
+            let root = path::Path::new("./images");
+            fs::create_dir(root)?;
+            let filepath = root.join(&filename);
             receive_file(&filepath, &data)?;
 
             tracing::info!(
