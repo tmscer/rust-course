@@ -66,9 +66,9 @@ impl Server {
         executor: &MessageExecutor,
     ) -> anyhow::Result<()> {
         loop {
-            match common::proto::Message::read_from(&mut client_stream) {
+            match common::proto::Payload::read_from(&mut client_stream) {
                 // If we failed to execute a valid message, propagate error further
-                Ok(msg) => executor.exec(msg)?,
+                Ok(payload) => executor.exec(payload.into_inner())?,
                 Err(err) => {
                     // Don't propagate client errors, just stop reading
                     tracing::debug!("Failed to read message: {err}");

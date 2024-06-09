@@ -67,7 +67,9 @@ fn handle_command_should_exit(
         Command::Message(msg) => common::proto::Message::Text(msg),
     };
 
-    let bytes_sent = message.write_to(conn).map_err(Error::hard)?;
+    let bytes_sent = common::proto::Payload::new(message)
+        .write_to(conn)
+        .map_err(Error::hard)?;
     tracing::debug!("Sent {bytes_sent} bytes");
 
     Ok(false)
