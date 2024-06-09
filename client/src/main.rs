@@ -2,6 +2,8 @@ use std::{fs, io, net, path};
 
 use clap::Parser;
 
+use common::proto;
+
 fn main() -> anyhow::Result<()> {
     common::tracing::init()?;
 
@@ -49,7 +51,7 @@ fn handle_command_should_exit(
             let basename = extract_basename(&filepath).map_err(Error::hard)?;
             let contents = fs::read(filepath).map_err(Error::soft)?;
 
-            common::proto::Message::File(basename, contents)
+            proto::request::Message::File(basename, contents)
         }
         Command::Image(filepath) => {
             let basename = extract_basename(&filepath).map_err(Error::hard)?;
@@ -62,12 +64,12 @@ fn handle_command_should_exit(
 
             let contents = fs::read(filepath).map_err(Error::soft)?;
 
-            common::proto::Message::File(basename, contents)
+            proto::request::Message::File(basename, contents)
         }
-        Command::Message(msg) => common::proto::Message::Text(msg),
+        Command::Message(msg) => proto::request::Message::Text(msg),
     };
 
-    let bytes_sent = common::proto::Payload::new(message)
+    let bytes_sent = proto::Payload::new(message)
         .write_to(conn)
         .map_err(Error::hard)?;
     tracing::debug!("Sent {bytes_sent} bytes");

@@ -1,7 +1,6 @@
 use std::io;
 
-mod msg;
-pub use msg::Message;
+pub mod request;
 
 type Len = u64;
 
@@ -86,9 +85,10 @@ impl<T: serde::de::DeserializeOwned> Payload<T> {
 }
 
 #[cfg(test)]
-mod tests {
+mod request_tests {
     use proptest::proptest;
 
+    use super::request::*;
     use super::*;
 
     fn assert_roundtrip_succeeds(input_msg: Message) {

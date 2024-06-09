@@ -115,8 +115,8 @@ impl MessageExecutor {
         Self { root }
     }
 
-    pub fn exec(&self, msg: common::proto::Message) -> anyhow::Result<()> {
-        use common::proto::Message;
+    pub fn exec(&self, msg: common::proto::request::Message) -> anyhow::Result<()> {
+        use common::proto::request::Message;
 
         tracing::debug!("Handling message");
 
