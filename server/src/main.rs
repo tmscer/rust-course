@@ -67,20 +67,17 @@ impl Server {
         executor: &MessageExecutor,
     ) -> anyhow::Result<()> {
         loop {
-            let payload = match proto::Payload::read_from(&mut client_stream) {
-                Ok(payload) => payload,
+            let response = match proto::Payload::read_from(&mut client_stream) {
+                Ok(payload) => match executor.exec(payload.into_inner()) {
+                    Ok(()) => proto::response::Message::Ok,
+                    Err(err) => {
+                        let msg = err.to_string();
+                        proto::response::Message::Err(proto::response::Error::unspecified(msg))
+                    }
+                },
                 Err(err) => {
-                    // Don't propagate client errors, just stop reading
                     tracing::debug!("Failed to read message: {err}");
-                    break;
-                }
-            };
-
-            let response = match executor.exec(payload.into_inner()) {
-                Ok(()) => proto::response::Message::Ok,
-                Err(err) => {
-                    let msg = err.to_string();
-                    proto::response::Message::Err(proto::response::Error::unspecified(msg))
+                    proto::response::Error::Read.into()
                 }
             };
 

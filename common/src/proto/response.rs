@@ -23,8 +23,16 @@ impl From<Message> for Result<(), Error> {
     }
 }
 
+impl From<Error> for Message {
+    fn from(err: Error) -> Self {
+        Message::Err(err)
+    }
+}
+
 #[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize, thiserror::Error)]
 pub enum Error {
+    #[error("failed to read message")]
+    Read,
     #[error("unspecified error: {0}")]
     Unspecified(String),
 }
