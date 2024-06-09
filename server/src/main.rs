@@ -1,6 +1,7 @@
 use std::{collections::HashMap, fs, io::Write, net, path};
 
 use clap::Parser;
+use common::proto;
 
 #[derive(Parser)]
 struct ServerArgs {
@@ -66,14 +67,27 @@ impl Server {
         executor: &MessageExecutor,
     ) -> anyhow::Result<()> {
         loop {
-            match common::proto::Payload::read_from(&mut client_stream) {
-                // If we failed to execute a valid message, propagate error further
-                Ok(payload) => executor.exec(payload.into_inner())?,
+            let payload = match proto::Payload::read_from(&mut client_stream) {
+                Ok(payload) => payload,
                 Err(err) => {
                     // Don't propagate client errors, just stop reading
                     tracing::debug!("Failed to read message: {err}");
                     break;
                 }
+            };
+
+            let response = match executor.exec(payload.into_inner()) {
+                Ok(()) => proto::response::Message::Ok,
+                Err(err) => {
+                    let msg = err.to_string();
+                    proto::response::Message::Err(proto::response::Error::unspecified(msg))
+                }
+            };
+
+            let payload = proto::Payload::new(&response);
+            if let Err(err) = payload.write_to(&mut client_stream) {
+                tracing::debug!("Failed to send error response: {err}");
+                break;
             }
         }
 
