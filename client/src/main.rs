@@ -13,23 +13,37 @@ fn main() -> anyhow::Result<()> {
     tracing::info!("Connected to {}", args.server_address);
 
     let iter_cmds = read_commands(io::stdin().lock());
-    let iter_cmd_results = iter_cmds.map(|cmd| handle_command_should_exit(&mut conn, cmd));
 
-    for cmd_result in iter_cmd_results {
-        match cmd_result {
+    for cmd in iter_cmds {
+        match handle_command_should_exit(&mut conn, cmd) {
             Ok(true) => {
                 tracing::info!("Exiting...");
                 break;
             }
             Ok(false) => {
-                tracing::info!("Command execution finished");
+                tracing::info!("Command sent");
             }
             Err(Error::Soft(err)) => {
                 tracing::warn!("Non-fatal error: {err}");
+                continue;
             }
             Err(Error::Hard(err)) => {
                 tracing::error!("Exiting due to: {err}");
                 return Err(err);
+            }
+        }
+
+        tracing::info!("Waiting for response...");
+        let response = proto::Payload::<proto::response::Message>::read_from(&mut conn)
+            .map_err(Error::hard)?
+            .into_inner();
+
+        match response {
+            proto::response::Message::Ok => {
+                tracing::info!("Request was successful");
+            }
+            proto::response::Message::Err(error) => {
+                tracing::error!("Request failed: {error}");
             }
         }
     }
