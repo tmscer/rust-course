@@ -1,6 +1,7 @@
 use std::io;
 
 pub mod request;
+pub mod response;
 
 type Len = u64;
 
@@ -85,21 +86,29 @@ impl<T: serde::de::DeserializeOwned> Payload<T> {
 }
 
 #[cfg(test)]
-mod request_tests {
-    use proptest::proptest;
-
-    use super::request::*;
+mod utils {
     use super::*;
 
-    fn assert_roundtrip_succeeds(input_msg: Message) {
+    pub fn assert_roundtrip_succeeds<T>(input_msg: T)
+    where
+        T: serde::Serialize + serde::de::DeserializeOwned + PartialEq + std::fmt::Debug,
+    {
         let mut wire = vec![];
         Payload(&input_msg).write_to(&mut wire).unwrap();
 
         let mut cursor = io::Cursor::new(wire);
-        let output_msg = Payload::<Message>::read_from(&mut cursor).unwrap();
+        let output_msg = Payload::<T>::read_from(&mut cursor).unwrap();
 
         assert_eq!(output_msg.into_inner(), input_msg);
     }
+}
+
+#[cfg(test)]
+mod request_tests {
+    use proptest::proptest;
+
+    use super::request::*;
+    use super::utils::assert_roundtrip_succeeds;
 
     #[test]
     fn test_basic_roundtrip() {
@@ -123,5 +132,21 @@ mod request_tests {
         fn test_image_roundtrip(filename in ".+", payload in proptest::arbitrary::any::<Vec<u8>>()) {
             assert_roundtrip_succeeds(Message::Image(filename, payload));
         }
+    }
+}
+
+#[cfg(test)]
+mod response_tests {
+    use super::response::*;
+    use super::utils::assert_roundtrip_succeeds;
+
+    #[test]
+    fn test_ok() {
+        assert_roundtrip_succeeds(Message::Ok);
+    }
+
+    #[test]
+    fn test_error() {
+        assert_roundtrip_succeeds(Message::Err(Error::unspecified("oops")));
     }
 }
