@@ -72,7 +72,7 @@ impl Server {
                     Ok(()) => proto::response::Message::Ok,
                     Err(err) => {
                         let msg = err.to_string();
-                        proto::response::Message::Err(proto::response::Error::unspecified(msg))
+                        proto::response::Message::Err(proto::response::Error::message_exec(msg))
                     }
                 },
                 Err(err) => {

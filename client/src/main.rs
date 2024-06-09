@@ -43,7 +43,7 @@ fn main() -> anyhow::Result<()> {
                 tracing::info!("Request was successful");
             }
             proto::response::Message::Err(error) => {
-                tracing::error!("Request failed: {error}");
+                tracing::error!("Server responded with an error: {error}");
             }
         }
     }

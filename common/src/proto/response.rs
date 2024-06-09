@@ -33,11 +33,17 @@ impl From<Error> for Message {
 pub enum Error {
     #[error("failed to read message")]
     Read,
+    #[error("message execution error: {0}")]
+    MessageExec(String),
     #[error("unspecified error: {0}")]
     Unspecified(String),
 }
 
 impl Error {
+    pub fn message_exec<S: ToString>(msg: S) -> Self {
+        Self::MessageExec(msg.to_string())
+    }
+
     pub fn unspecified<S: ToString>(msg: S) -> Self {
         Self::Unspecified(msg.to_string())
     }
