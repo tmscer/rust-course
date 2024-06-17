@@ -6,6 +6,9 @@ version = "0.1.0"
 [dependencies]
 common = {path = "../common"}
 
+diesel = {version = "2.1.6", features = ["postgres"]}
+diesel-async = {version = "0.4.1", features = ["postgres"]}
+
 anyhow = {workspace = true}
 clap = {workspace = true}
 thiserror = {workspace = true}
