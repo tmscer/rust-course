@@ -9,4 +9,5 @@ common = {path = "../common"}
 anyhow = {workspace = true}
 clap = {workspace = true}
 thiserror = {workspace = true}
+tokio = {workspace = true}
 tracing = {workspace = true}

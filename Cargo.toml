@@ -15,6 +15,7 @@ members = [
 ]
 
 [workspace.dependencies]
+tokio = {version = "1.38.0", features = ["full"]}
 anyhow = "1.0"
 clap = "4.5.4"
 serde = {version = "1.0", features = ["derive"]}
