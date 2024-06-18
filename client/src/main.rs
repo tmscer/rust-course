@@ -1,21 +1,22 @@
-use std::{fs, io, net, path};
+use std::{io, path};
 
 use clap::Parser;
 
 use common::proto;
 
-fn main() -> anyhow::Result<()> {
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
     common::tracing::init()?;
 
     let args = common::cli::Args::parse();
-    let mut conn = net::TcpStream::connect(args.server_address)?;
+    let mut conn = tokio::net::TcpStream::connect(args.server_address).await?;
 
     tracing::info!("Connected to {}", args.server_address);
 
     let iter_cmds = read_commands(io::stdin().lock());
 
     for cmd in iter_cmds {
-        match handle_command_should_exit(&mut conn, cmd) {
+        match handle_command_should_exit(&mut conn, cmd).await {
             Ok(true) => {
                 tracing::info!("Exiting...");
                 break;
@@ -35,6 +36,7 @@ fn main() -> anyhow::Result<()> {
 
         tracing::info!("Waiting for response...");
         let response = proto::Payload::<proto::response::Message>::read_from(&mut conn)
+            .await
             .map_err(Error::hard)?
             .into_inner();
 
@@ -51,8 +53,8 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn handle_command_should_exit(
-    conn: &mut net::TcpStream,
+async fn handle_command_should_exit(
+    conn: &mut tokio::net::TcpStream,
     cmd: anyhow::Result<Command>,
 ) -> Result<bool, Error> {
     let cmd = cmd.map_err(Error::hard)?;
@@ -63,7 +65,7 @@ fn handle_command_should_exit(
         }
         Command::File(filepath) => {
             let basename = extract_basename(&filepath).map_err(Error::hard)?;
-            let contents = fs::read(filepath).map_err(Error::soft)?;
+            let contents = tokio::fs::read(filepath).await.map_err(Error::soft)?;
 
             proto::request::Message::File(basename, contents)
         }
@@ -76,7 +78,7 @@ fn handle_command_should_exit(
                 )));
             }
 
-            let contents = fs::read(filepath).map_err(Error::soft)?;
+            let contents = tokio::fs::read(filepath).await.map_err(Error::soft)?;
 
             proto::request::Message::File(basename, contents)
         }
@@ -85,6 +87,7 @@ fn handle_command_should_exit(
 
     let bytes_sent = proto::Payload::new(message)
         .write_to(conn)
+        .await
         .map_err(Error::hard)?;
     tracing::debug!("Sent {bytes_sent} bytes");
 

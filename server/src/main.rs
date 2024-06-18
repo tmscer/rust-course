@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fs, io::Write, net, path};
+use std::{collections::HashMap, fs, net, path};
 
 use clap::Parser;
 use common::proto;
@@ -11,64 +11,66 @@ struct ServerArgs {
     common: common::cli::Args,
 }
 
-fn main() -> anyhow::Result<()> {
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
     common::tracing::init()?;
 
     let args = ServerArgs::parse();
 
-    let listener = net::TcpListener::bind(args.common.server_address)?;
+    let listener = tokio::net::TcpListener::bind(args.common.server_address).await?;
     tracing::info!("Listening on {}", args.common.server_address);
 
     let server = Server::new(listener);
     let executor = MessageExecutor::new(args.root);
 
-    server.run(executor)?;
+    server.run(executor).await?;
 
     Ok(())
 }
 
 struct Server {
-    listener: net::TcpListener,
-    clients: HashMap<net::SocketAddr, std::thread::JoinHandle<anyhow::Result<()>>>,
+    listener: tokio::net::TcpListener,
+    clients: HashMap<net::SocketAddr, tokio::task::JoinHandle<anyhow::Result<()>>>,
 }
 
 impl Server {
-    pub fn new(listener: net::TcpListener) -> Self {
+    pub fn new(listener: tokio::net::TcpListener) -> Self {
         Self {
             listener,
             clients: HashMap::new(),
         }
     }
 
-    pub fn run(mut self, executor: MessageExecutor) -> anyhow::Result<()> {
+    pub async fn run(mut self, executor: MessageExecutor) -> anyhow::Result<()> {
         let executor = std::sync::Arc::new(executor);
 
         loop {
-            self.join_finished_client_threads()?;
+            self.join_finished_clients().await?;
 
-            let (client_stream, client_addr) = self.listener.accept()?;
+            let (client_stream, client_addr) = self.listener.accept().await?;
 
             let executor = executor.clone();
-            let handle = std::thread::spawn(move || {
+
+            let handle = tokio::spawn(async move {
                 tracing::info!("Handling connection from {client_addr}");
-                tracing::info_span!("handle_client", client = %client_addr)
-                    .in_scope(|| Self::handle_client(client_stream, executor.as_ref()))?;
+                Self::handle_client(client_stream, executor.as_ref()).await?;
                 tracing::info!("Closing connection to {client_addr}");
 
-                Ok(())
+                anyhow::Ok(())
             });
 
             self.clients.insert(client_addr, handle);
         }
     }
 
-    fn handle_client(
-        mut client_stream: net::TcpStream,
+    #[tracing::instrument(skip(client_stream, executor), fields(client = %client_stream.peer_addr()?))]
+    async fn handle_client(
+        mut client_stream: tokio::net::TcpStream,
         executor: &MessageExecutor,
     ) -> anyhow::Result<()> {
         loop {
-            let response = match proto::Payload::read_from(&mut client_stream) {
-                Ok(payload) => match executor.exec(payload.into_inner()) {
+            let response = match proto::Payload::read_from(&mut client_stream).await {
+                Ok(payload) => match executor.exec(payload.into_inner()).await {
                     Ok(()) => proto::response::Message::Ok,
                     Err(err) => {
                         let msg = err.to_string();
@@ -82,7 +84,7 @@ impl Server {
             };
 
             let payload = proto::Payload::new(&response);
-            if let Err(err) = payload.write_to(&mut client_stream) {
+            if let Err(err) = payload.write_to(&mut client_stream).await {
                 tracing::debug!("Failed to send error response: {err}");
                 break;
             }
@@ -91,7 +93,7 @@ impl Server {
         Ok(())
     }
 
-    fn join_finished_client_threads(&mut self) -> anyhow::Result<()> {
+    async fn join_finished_clients(&mut self) -> anyhow::Result<()> {
         let mut finished_clients = vec![];
         for (client_addr, handle) in self.clients.iter_mut() {
             if handle.is_finished() {
@@ -104,7 +106,7 @@ impl Server {
         for finished_client_addr in finished_clients {
             if let Some(handle) = self.clients.remove(&finished_client_addr) {
                 handle
-                    .join()
+                    .await
                     .map_err(|_| anyhow::Error::msg("Couldn't join client thread"))??;
             }
         }
@@ -126,7 +128,7 @@ impl MessageExecutor {
         Self { root }
     }
 
-    pub fn exec(&self, msg: common::proto::request::Message) -> anyhow::Result<()> {
+    pub async fn exec(&self, msg: common::proto::request::Message) -> anyhow::Result<()> {
         use common::proto::request::Message;
 
         tracing::debug!("Handling message");
@@ -135,8 +137,9 @@ impl MessageExecutor {
             Message::File(filename, data) => {
                 let file_root = self.root.join("files");
                 fs::create_dir_all(&file_root)?;
+                tokio::fs::create_dir_all(&file_root).await?;
                 let filepath = file_root.join(&filename);
-                receive_file(&filepath, &data)?;
+                receive_file(&filepath, &data).await?;
 
                 tracing::info!(
                     "Received file {filename} ({} bytes) to {:?}",
@@ -146,9 +149,9 @@ impl MessageExecutor {
             }
             Message::Image(filename, data) => {
                 let image_root = self.root.join("images");
-                fs::create_dir_all(&image_root)?;
+                tokio::fs::create_dir_all(&image_root).await?;
                 let filepath = image_root.join(&filename);
-                receive_file(&filepath, &data)?;
+                receive_file(&filepath, &data).await?;
 
                 tracing::info!(
                     "Received image {filename} ({} bytes) to {:?}",
@@ -165,9 +168,11 @@ impl MessageExecutor {
     }
 }
 
-fn receive_file(filepath: &path::Path, data: &[u8]) -> anyhow::Result<()> {
-    let mut file = fs::File::create(filepath)?;
-    file.write_all(data)?;
+async fn receive_file(filepath: &path::Path, data: &[u8]) -> anyhow::Result<()> {
+    use tokio::io::AsyncWriteExt;
+
+    let mut file = tokio::fs::File::create(filepath).await?;
+    file.write_all(data).await?;
 
     Ok(())
 }

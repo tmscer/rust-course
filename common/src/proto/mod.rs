@@ -43,15 +43,15 @@ impl<T: serde::Serialize> Payload<T> {
     ///
     /// If the serialization fails, an error is returned.
     /// This can happen e.g. if your architecture's `usize` cannot contain `u64`.
-    pub fn write_to<W>(&self, output: &mut W) -> anyhow::Result<usize>
+    pub async fn write_to<W>(&self, output: &mut W) -> anyhow::Result<usize>
     where
-        W: io::Write,
+        W: tokio::io::AsyncWriteExt + Unpin,
     {
         let payload = serde_cbor::to_vec(&self.0)?;
         let len: Len = payload.len().try_into()?;
 
-        output.write_all(&len.to_be_bytes())?;
-        output.write_all(&payload)?;
+        output.write_all(&len.to_be_bytes()).await?;
+        output.write_all(&payload).await?;
 
         let bytes_sent = payload.len() + std::mem::size_of::<Len>();
 
@@ -66,16 +66,16 @@ impl<T: serde::de::DeserializeOwned> Payload<T> {
     ///
     /// If the deserialization fails, an error is returned.
     /// This can happen e.g. if your architecture's `usize` cannot contain `u64`.
-    pub fn read_from<R>(input: &mut R) -> anyhow::Result<Self>
+    pub async fn read_from<R>(input: &mut R) -> anyhow::Result<Self>
     where
-        R: io::Read,
+        R: tokio::io::AsyncReadExt + Unpin,
     {
         let mut len_bytes = [0u8; std::mem::size_of::<Len>()];
-        input.read_exact(&mut len_bytes)?;
+        input.read_exact(&mut len_bytes).await?;
 
         let len: usize = Len::from_be_bytes(len_bytes).try_into()?;
         let mut payload = vec![0u8; len];
-        input.read_exact(&mut payload)?;
+        input.read_exact(&mut payload).await?;
 
         let cursor = io::Cursor::new(payload);
 
@@ -89,15 +89,15 @@ impl<T: serde::de::DeserializeOwned> Payload<T> {
 mod utils {
     use super::*;
 
-    pub fn assert_roundtrip_succeeds<T>(input_msg: T)
+    pub async fn assert_roundtrip_succeeds<T>(input_msg: T)
     where
         T: serde::Serialize + serde::de::DeserializeOwned + PartialEq + std::fmt::Debug,
     {
         let mut wire = vec![];
-        Payload(&input_msg).write_to(&mut wire).unwrap();
+        Payload(&input_msg).write_to(&mut wire).await.unwrap();
 
         let mut cursor = io::Cursor::new(wire);
-        let output_msg = Payload::<T>::read_from(&mut cursor).unwrap();
+        let output_msg = Payload::<T>::read_from(&mut cursor).await.unwrap();
 
         assert_eq!(output_msg.into_inner(), input_msg);
     }
@@ -105,32 +105,56 @@ mod utils {
 
 #[cfg(test)]
 mod request_tests {
-    use proptest::proptest;
+    use futures::Future;
 
     use super::request::*;
     use super::utils::assert_roundtrip_succeeds;
 
-    #[test]
-    fn test_basic_roundtrip() {
+    #[tokio::test]
+    async fn test_basic_roundtrip() {
         let input_msg = Message::Text("hello!!!!".to_string());
 
-        assert_roundtrip_succeeds(input_msg);
+        assert_roundtrip_succeeds(input_msg).await;
     }
 
-    proptest! {
+    fn async_prop_test(f: impl Future<Output = ()> + Send + 'static) {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_time()
+            .build()
+            .unwrap();
+
+        rt.block_on(f)
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_async_prop_test_panic() {
+        async_prop_test(async {
+            panic!("this is a test");
+        });
+    }
+
+    // Tried crate `proptest_async` but it had compilation issues
+    proptest::proptest! {
         #[test]
         fn test_message_roundtrip(text in ".*") {
-            assert_roundtrip_succeeds(Message::Text(text));
+            async_prop_test(async {
+                assert_roundtrip_succeeds(Message::Text(text)).await;
+            });
         }
 
-       #[test]
+        #[test]
         fn test_file_roundtrip(filename in ".+", payload in proptest::arbitrary::any::<Vec<u8>>()) {
-            assert_roundtrip_succeeds(Message::File(filename, payload));
+            async_prop_test(async {
+                assert_roundtrip_succeeds(Message::File(filename, payload)).await;
+            });
         }
 
         #[test]
         fn test_image_roundtrip(filename in ".+", payload in proptest::arbitrary::any::<Vec<u8>>()) {
-            assert_roundtrip_succeeds(Message::Image(filename, payload));
+            async_prop_test(async {
+                assert_roundtrip_succeeds(Message::Image(filename, payload)).await;
+            });
         }
     }
 }
@@ -140,13 +164,13 @@ mod response_tests {
     use super::response::*;
     use super::utils::assert_roundtrip_succeeds;
 
-    #[test]
-    fn test_ok() {
-        assert_roundtrip_succeeds(Message::Ok);
+    #[tokio::test]
+    async fn test_ok() {
+        assert_roundtrip_succeeds(Message::Ok).await;
     }
 
-    #[test]
-    fn test_error() {
-        assert_roundtrip_succeeds(Message::Err(Error::unspecified("oops")));
+    #[tokio::test]
+    async fn test_error() {
+        assert_roundtrip_succeeds(Message::Err(Error::unspecified("oops"))).await;
     }
 }
