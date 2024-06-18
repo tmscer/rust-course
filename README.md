@@ -11,6 +11,10 @@ See individual crates
 
 for details.
 
+## Quick Start
+
+Spin up Postgres using `docker-compose up -d`.
+
 ### Common
 
 Defines protocol for sending messages and files and how to write/read to/from network, CLI arguments
