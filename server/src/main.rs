@@ -1,7 +1,8 @@
-use std::{collections::HashMap, fs, net, path};
+use std::{cmp::Ordering, collections::HashMap, net, path};
 
 use clap::Parser;
 use common::proto;
+use tokio::io::AsyncWriteExt;
 
 #[derive(Parser)]
 struct ServerArgs {
@@ -70,7 +71,10 @@ impl Server {
     ) -> anyhow::Result<()> {
         loop {
             let response = match proto::Payload::read_from(&mut client_stream).await {
-                Ok(payload) => match executor.exec(payload.into_inner()).await {
+                Ok(payload) => match executor
+                    .exec(payload.into_inner(), &mut client_stream)
+                    .await
+                {
                     Ok(()) => proto::response::Message::Ok,
                     Err(err) => {
                         let msg = err.to_string();
@@ -79,7 +83,7 @@ impl Server {
                 },
                 Err(err) => {
                     tracing::debug!("Failed to read message: {err}");
-                    proto::response::Error::Read.into()
+                    proto::response::Error::Read(err.to_string()).into()
                 }
             };
 
@@ -128,17 +132,18 @@ impl MessageExecutor {
         Self { root }
     }
 
-    pub async fn exec(&self, msg: common::proto::request::Message) -> anyhow::Result<()> {
+    pub async fn exec(
+        &self,
+        msg: common::proto::request::Message,
+        stream: &mut tokio::net::TcpStream,
+    ) -> anyhow::Result<()> {
         use common::proto::request::Message;
 
         tracing::debug!("Handling message");
 
         match msg {
             Message::File(filename, data) => {
-                let file_root = self.root.join("files");
-                fs::create_dir_all(&file_root)?;
-                tokio::fs::create_dir_all(&file_root).await?;
-                let filepath = file_root.join(&filename);
+                let filepath = self.get_file_path(&filename).await?;
                 receive_file(&filepath, &data).await?;
 
                 tracing::info!(
@@ -148,14 +153,32 @@ impl MessageExecutor {
                 );
             }
             Message::Image(filename, data) => {
-                let image_root = self.root.join("images");
-                tokio::fs::create_dir_all(&image_root).await?;
-                let filepath = image_root.join(&filename);
+                let filepath = self.get_image_path(&filename).await?;
                 receive_file(&filepath, &data).await?;
 
                 tracing::info!(
                     "Received image {filename} ({} bytes) to {:?}",
                     data.len(),
+                    filepath
+                );
+            }
+            Message::FileStream(filename, size) => {
+                let filepath = self.get_file_path(&filename).await?;
+                receive_streamed_file(&filepath, size, stream).await?;
+
+                tracing::info!(
+                    "Received file {filename} ({} bytes) to {:?} via stream",
+                    size,
+                    filepath
+                );
+            }
+            Message::ImageStream(filename, size) => {
+                let filepath = self.get_image_path(&filename).await?;
+                receive_streamed_file(&filepath, size, stream).await?;
+
+                tracing::info!(
+                    "Received image {filename} ({} bytes) to {:?} via stream",
+                    size,
                     filepath
                 );
             }
@@ -166,6 +189,28 @@ impl MessageExecutor {
 
         Ok(())
     }
+
+    async fn get_file_path(&self, filename: &str) -> anyhow::Result<path::PathBuf> {
+        let file_root = self.mk_files_dir().await?;
+        Ok(file_root.join(filename))
+    }
+
+    async fn mk_files_dir(&self) -> anyhow::Result<path::PathBuf> {
+        let files_dir = self.root.join("files");
+        tokio::fs::create_dir_all(&files_dir).await?;
+        Ok(files_dir)
+    }
+
+    async fn get_image_path(&self, filename: &str) -> anyhow::Result<path::PathBuf> {
+        let image_root = self.mk_images_dir().await?;
+        Ok(image_root.join(filename))
+    }
+
+    async fn mk_images_dir(&self) -> anyhow::Result<path::PathBuf> {
+        let images_dir = self.root.join("images");
+        tokio::fs::create_dir_all(&images_dir).await?;
+        Ok(images_dir)
+    }
 }
 
 async fn receive_file(filepath: &path::Path, data: &[u8]) -> anyhow::Result<()> {
@@ -175,4 +220,124 @@ async fn receive_file(filepath: &path::Path, data: &[u8]) -> anyhow::Result<()> 
     file.write_all(data).await?;
 
     Ok(())
+}
+
+#[derive(Debug, thiserror::Error)]
+enum StreamFileError {
+    #[error("Expected {expected} bytes but received {received} bytes (too many)")]
+    ExpectedMore { expected: u64, received: u64 },
+    #[error("Expected {expected} bytes but received {received} bytes (not enough)")]
+    ExpectedLess { expected: u64, received: u64 },
+    #[error("Client explicitly aborted file transfer without `end` message. Received {received} out of {expected} bytes")]
+    Abort { received: u64, expected: u64 },
+    #[error("File system error: {0}")]
+    Fs(anyhow::Error),
+    #[error("Client read error: {0}")]
+    Read(anyhow::Error),
+}
+
+impl StreamFileError {
+    fn fs<E: Into<anyhow::Error>>(error: E) -> Self {
+        Self::Fs(error.into())
+    }
+
+    fn read<E: Into<anyhow::Error>>(error: E) -> Self {
+        Self::Read(error.into())
+    }
+}
+
+impl From<StreamFileError> for proto::response::Error {
+    fn from(error: StreamFileError) -> Self {
+        match error {
+            StreamFileError::Fs(e) => Self::MessageExec(e.to_string()),
+            StreamFileError::Abort { .. } => Self::ClientAbort,
+            // Explicitly listing the errors in case new variants are added.
+            // The programmer will have to decide how to handle them instead of
+            // automatically converting them to `Read`.
+            StreamFileError::Read(_)
+            | StreamFileError::ExpectedLess { .. }
+            | StreamFileError::ExpectedMore { .. } => Self::Read(error.to_string()),
+        }
+    }
+}
+
+async fn receive_streamed_file(
+    filepath: &path::PathBuf,
+    expected: u64,
+    stream: &mut tokio::net::TcpStream,
+) -> Result<(), StreamFileError> {
+    let mut file = tokio::fs::File::create(filepath)
+        .await
+        .map_err(StreamFileError::fs)?;
+    let mut received = 0;
+
+    while received < expected {
+        match proto::Payload::read_from(stream)
+            .await
+            .map(|p| p.into_inner())
+        {
+            Ok(proto::request::StreamedFile::Payload(data)) => {
+                file.write_all(&data).await.map_err(StreamFileError::fs)?;
+                received += u64::try_from(data.len()).map_err(StreamFileError::read)?;
+            }
+            Ok(proto::request::StreamedFile::Abort) => {
+                if let Err(e) = tokio::fs::remove_file(filepath)
+                    .await
+                    .map_err(StreamFileError::fs)
+                {
+                    tracing::error!("Failed to remove file due to client abort: {e}");
+                }
+
+                return Err(StreamFileError::Abort { expected, received });
+            }
+            Ok(proto::request::StreamedFile::End) => {
+                break;
+            }
+            Err(e) => {
+                return Err(StreamFileError::Read(e));
+            }
+        }
+    }
+
+    decide_streamed_file_result(received, expected)
+}
+
+fn decide_streamed_file_result(received: u64, expected: u64) -> Result<(), StreamFileError> {
+    match expected.cmp(&received) {
+        Ordering::Equal => Ok(()),
+        Ordering::Greater => Err(StreamFileError::ExpectedMore { expected, received }),
+        Ordering::Less => Err(StreamFileError::ExpectedLess { expected, received }),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_decide_streamed_file_result_equal() {
+        let received = 10;
+        let expected = 10;
+        let result = decide_streamed_file_result(received, expected);
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_decide_streamed_file_result_less() {
+        let received = 5;
+        let expected = 10;
+        let result = decide_streamed_file_result(received, expected);
+
+        assert!(matches!(result, Err(StreamFileError::ExpectedMore { .. })));
+    }
+
+    #[test]
+    fn test_decide_streamed_file_result_more() {
+        let received = 15;
+        let expected = 10;
+        let result = decide_streamed_file_result(received, expected);
+
+        assert!(matches!(result, Err(StreamFileError::ExpectedLess { .. })));
+    }
 }

@@ -18,10 +18,7 @@ Spin up Postgres using `docker-compose up -d`.
 ### Common
 
 Defines protocol for sending messages and files and how to write/read to/from network, CLI arguments
-and other utilities used by both `client` and `server`.
-
-The protocol is simplistic and one-way. See [./common/src/proto.rs](./common/src/proto.rs) for details.
-One thing to note is that files are read into memory and sent as a whole, so it's not suitable for large files.
+and other utilities used by both `client` and `server`. See [./common/src/proto.rs](./common/src/proto.rs) for details.
 
 ### Client
 

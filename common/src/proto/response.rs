@@ -36,7 +36,9 @@ impl From<Error> for Message {
 pub enum Error {
     /// Failed to read message - e.g. due to client incompatibility.
     #[error("failed to read message")]
-    Read,
+    Read(String),
+    #[error("abort understood")]
+    ClientAbort,
     /// Failed to execute message - e.g. not enough disk space.
     #[error("message execution error: {0}")]
     MessageExec(String),
