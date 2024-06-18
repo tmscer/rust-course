@@ -8,6 +8,7 @@ common = {path = "../common"}
 
 anyhow = {workspace = true}
 clap = {workspace = true}
+human_bytes = {workspace = true}
 thiserror = {workspace = true}
 tokio = {workspace = true}
 tracing = {workspace = true}

@@ -12,6 +12,7 @@ diesel-async = {version = "0.4.1", features = ["postgres"]}
 anyhow = {workspace = true}
 clap = {workspace = true}
 futures = {workspace = true}
+human_bytes = {workspace = true}
 thiserror = {workspace = true}
 tokio = {workspace = true}
 tracing = {workspace = true}

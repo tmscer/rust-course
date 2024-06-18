@@ -141,46 +141,28 @@ impl MessageExecutor {
 
         tracing::debug!("Handling message");
 
+        let start = tokio::time::Instant::now();
+
         match msg {
             Message::File(filename, data) => {
                 let filepath = self.get_file_path(&filename).await?;
                 receive_file(&filepath, &data).await?;
-
-                tracing::info!(
-                    "Received file {filename} ({} bytes) to {:?}",
-                    data.len(),
-                    filepath
-                );
+                log_file_receive(start, &filename, data.len() as f64);
             }
             Message::Image(filename, data) => {
                 let filepath = self.get_image_path(&filename).await?;
                 receive_file(&filepath, &data).await?;
-
-                tracing::info!(
-                    "Received image {filename} ({} bytes) to {:?}",
-                    data.len(),
-                    filepath
-                );
+                log_file_receive(start, &filename, data.len() as f64);
             }
             Message::FileStream(filename, size) => {
                 let filepath = self.get_file_path(&filename).await?;
                 receive_streamed_file(&filepath, size, stream).await?;
-
-                tracing::info!(
-                    "Received file {filename} ({} bytes) to {:?} via stream",
-                    size,
-                    filepath
-                );
+                log_file_receive(start, &filename, size as f64);
             }
             Message::ImageStream(filename, size) => {
                 let filepath = self.get_image_path(&filename).await?;
                 receive_streamed_file(&filepath, size, stream).await?;
-
-                tracing::info!(
-                    "Received image {filename} ({} bytes) to {:?} via stream",
-                    size,
-                    filepath
-                );
+                log_file_receive(start, &filename, size as f64);
             }
             Message::Text(msg) => {
                 tracing::info!("Message from: {msg}");
@@ -211,6 +193,18 @@ impl MessageExecutor {
         tokio::fs::create_dir_all(&images_dir).await?;
         Ok(images_dir)
     }
+}
+
+fn log_file_receive(start: tokio::time::Instant, filename: &str, filesize: f64) {
+    let duration = start.elapsed();
+    let speed = filesize / duration.as_secs_f64();
+
+    tracing::info!(
+        "Received file {filename} ({filesize} bytes) in {duration:?}, speed: {speed}/s",
+        filename = filename,
+        filesize = human_bytes::human_bytes(filesize),
+        speed = human_bytes::human_bytes(speed)
+    );
 }
 
 async fn receive_file(filepath: &path::Path, data: &[u8]) -> anyhow::Result<()> {
@@ -271,7 +265,7 @@ async fn receive_streamed_file(
         .map_err(StreamFileError::fs)?;
     let mut received = 0;
 
-    while received < expected {
+    while received <= expected {
         match proto::Payload::read_from(stream)
             .await
             .map(|p| p.into_inner())
