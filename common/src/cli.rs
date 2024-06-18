@@ -3,8 +3,11 @@ use std::{net, str::FromStr};
 pub const DEFAULT_SERVER_ADDR: net::SocketAddr =
     net::SocketAddr::new(net::IpAddr::V4(net::Ipv4Addr::LOCALHOST), 11_111);
 
+/// Command-line arguments for both client and server. It contains only one argument - server address.
+/// Server uses it to bind to a specific address, while client uses it to connect to the server.
 #[derive(clap::Parser)]
 pub struct Args {
+    /// Server address to bind to or connect to.
     #[arg(index = 1, value_parser(parse_socket_addr), default_value_t = DEFAULT_SERVER_ADDR)]
     pub server_address: net::SocketAddr,
 }

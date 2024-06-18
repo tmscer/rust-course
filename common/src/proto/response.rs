@@ -1,7 +1,9 @@
 /// Represents a message server sends to client in response to a request.
 #[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum Message {
+    /// Request was handled successfully.
     Ok,
+    /// Request failed with an error.
     Err(Error),
 }
 
@@ -29,12 +31,16 @@ impl From<Error> for Message {
     }
 }
 
+/// Represents an error that occurred during request handling.
 #[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize, thiserror::Error)]
 pub enum Error {
+    /// Failed to read message - e.g. due to client incompatibility.
     #[error("failed to read message")]
     Read,
+    /// Failed to execute message - e.g. not enough disk space.
     #[error("message execution error: {0}")]
     MessageExec(String),
+    /// Unspecified error.
     #[error("unspecified error: {0}")]
     Unspecified(String),
 }
