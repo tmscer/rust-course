@@ -59,39 +59,98 @@ async fn handle_command_should_exit(
 ) -> Result<bool, Error> {
     let cmd = cmd.map_err(Error::hard)?;
 
+    let mut file_to_send = Option::<path::PathBuf>::None;
+
     let message = match cmd {
         Command::Quit => {
             return Ok(true);
         }
         Command::File(filepath) => {
             let basename = extract_basename(&filepath).map_err(Error::hard)?;
-            let contents = tokio::fs::read(filepath).await.map_err(Error::soft)?;
+            let metadata = tokio::fs::metadata(&filepath).await.map_err(Error::soft)?;
 
-            proto::request::Message::File(basename, contents)
+            if !metadata.is_file() {
+                return Err(Error::Soft(anyhow::Error::msg("Only files are supported")));
+            }
+
+            let file_size = metadata.len();
+            file_to_send = Some(filepath);
+
+            tracing::debug!("File size: {file_size}");
+            proto::request::Message::FileStream(basename, file_size)
         }
         Command::Image(filepath) => {
             let basename = extract_basename(&filepath).map_err(Error::hard)?;
+            let metadata = tokio::fs::metadata(&filepath).await.map_err(Error::soft)?;
 
-            if !basename.ends_with(".png") {
+            if !metadata.is_file() {
+                return Err(Error::Soft(anyhow::Error::msg("Only files are supported")));
+            } else if !basename.ends_with(".png") {
                 return Err(Error::Soft(anyhow::Error::msg(
                     "Only .png images are supported",
                 )));
             }
 
-            let contents = tokio::fs::read(filepath).await.map_err(Error::soft)?;
+            let file_size = metadata.len();
+            file_to_send = Some(filepath);
 
-            proto::request::Message::File(basename, contents)
+            tracing::debug!("Image size: {file_size}");
+            proto::request::Message::ImageStream(basename, file_size)
         }
         Command::Message(msg) => proto::request::Message::Text(msg),
     };
 
-    let bytes_sent = proto::Payload::new(message)
+    let mut bytes_sent = proto::Payload::new(message)
         .write_to(conn)
         .await
         .map_err(Error::hard)?;
-    tracing::debug!("Sent {bytes_sent} bytes");
+
+    if let Some(filename) = file_to_send {
+        bytes_sent += send_stream_file(conn, &filename).await?;
+    }
+
+    tracing::debug!("Sent a total of {bytes_sent} bytes");
 
     Ok(false)
+}
+
+async fn send_stream_file(
+    conn: &mut tokio::net::TcpStream,
+    filepath: &path::Path,
+) -> Result<usize, Error> {
+    use tokio::io::AsyncReadExt;
+
+    let mut reader = tokio::fs::File::open(&filepath)
+        .await
+        .map(tokio::io::BufReader::new)
+        .map_err(Error::soft)?;
+
+    let mut buf = vec![0; 4096];
+    let mut bytes_sent = 0;
+
+    loop {
+        let bytes_read = reader.read(&mut buf).await.map_err(Error::soft)?;
+
+        if bytes_read == 0 {
+            break;
+        }
+
+        let message = proto::request::StreamedFile::Payload(buf[..bytes_read].to_vec());
+
+        bytes_sent += proto::Payload::new(message)
+            .write_to(conn)
+            .await
+            .map_err(Error::hard)?;
+
+        tracing::debug!("Sent chunk of {bytes_sent} bytes");
+    }
+
+    proto::Payload::new(proto::request::StreamedFile::End)
+        .write_to(conn)
+        .await
+        .map_err(Error::hard)?;
+
+    Ok(bytes_sent)
 }
 
 #[derive(Debug, thiserror::Error)]
