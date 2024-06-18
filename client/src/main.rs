@@ -76,7 +76,7 @@ async fn handle_command_should_exit(
             let file_size = metadata.len();
             file_to_send = Some(filepath);
 
-            tracing::debug!("File size: {file_size}");
+            tracing::debug!("File size: {}", human_bytes::human_bytes(file_size as f64));
             proto::request::Message::FileStream(basename, file_size)
         }
         Command::Image(filepath) => {
@@ -94,7 +94,7 @@ async fn handle_command_should_exit(
             let file_size = metadata.len();
             file_to_send = Some(filepath);
 
-            tracing::debug!("Image size: {file_size}");
+            tracing::debug!("Image size: {}", human_bytes::human_bytes(file_size as f64));
             proto::request::Message::ImageStream(basename, file_size)
         }
         Command::Message(msg) => proto::request::Message::Text(msg),
@@ -109,7 +109,10 @@ async fn handle_command_should_exit(
         bytes_sent += send_stream_file(conn, &filename).await?;
     }
 
-    tracing::debug!("Sent a total of {bytes_sent} bytes");
+    tracing::debug!(
+        "Sent a total of {} bytes",
+        human_bytes::human_bytes(bytes_sent as f64)
+    );
 
     Ok(false)
 }
@@ -127,6 +130,9 @@ async fn send_stream_file(
 
     let mut buf = vec![0; 4096];
     let mut bytes_sent = 0;
+    let mut bytes_file = 0;
+
+    let start = tokio::time::Instant::now();
 
     loop {
         let bytes_read = reader.read(&mut buf).await.map_err(Error::soft)?;
@@ -137,18 +143,28 @@ async fn send_stream_file(
 
         let message = proto::request::StreamedFile::Payload(buf[..bytes_read].to_vec());
 
+        bytes_file += bytes_read;
         bytes_sent += proto::Payload::new(message)
             .write_to(conn)
             .await
             .map_err(Error::hard)?;
 
-        tracing::debug!("Sent chunk of {bytes_sent} bytes");
+        tracing::debug!("Sent {bytes_sent} bytes, chunk size was {bytes_read}");
     }
 
     proto::Payload::new(proto::request::StreamedFile::End)
         .write_to(conn)
         .await
         .map_err(Error::hard)?;
+
+    tracing::debug!("Sent the end of file marker");
+    let speed = bytes_file as f64 / start.elapsed().as_secs_f64();
+
+    tracing::debug!(
+        "Sent {} of data in total, speed was {}/s",
+        human_bytes::human_bytes(bytes_file as f64),
+        human_bytes::human_bytes(speed),
+    );
 
     Ok(bytes_sent)
 }
