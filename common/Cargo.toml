@@ -14,5 +14,13 @@ tokio = {workspace = true}
 tracing = {workspace = true}
 tracing-subscriber = {workspace = true}
 
+rustls = {workspace = true, optional = true}
+rustls-pemfile = {workspace = true, optional = true}
+rustls-pki-types = {workspace = true, optional = true}
+tokio-rustls = {workspace = true, optional = true}
+
 [dev-dependencies]
 proptest = "1.4"
+
+[features]
+tls = ["rustls", "tokio-rustls", "rustls-pemfile", "rustls-pki-types"]

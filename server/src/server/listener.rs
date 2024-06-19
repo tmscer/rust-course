@@ -1,5 +1,5 @@
 #[async_trait::async_trait]
-pub trait Listener: Send {
+pub trait Listener: Send + Sync {
     type Stream: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + Send;
 
     async fn accept_conn(&self) -> anyhow::Result<(Self::Stream, std::net::SocketAddr)>;

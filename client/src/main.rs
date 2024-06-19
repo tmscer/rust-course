@@ -24,7 +24,7 @@ async fn main() -> anyhow::Result<()> {
     common::tracing::init()?;
 
     let args = ClientArgs::parse();
-    let mut conn = tokio::net::TcpStream::connect(args.common.server_address).await?;
+    let mut conn = create_connection(&args).await?;
 
     tracing::info!("Connected to {}", args.common.server_address);
 
@@ -68,6 +68,9 @@ async fn main() -> anyhow::Result<()> {
         }
     }
 
+    use tokio::io::AsyncWriteExt;
+    conn.shutdown().await?;
+
     Ok(())
 }
 
@@ -75,4 +78,36 @@ fn read_commands<R: io::BufRead>(reader: R) -> impl Iterator<Item = anyhow::Resu
     let lines = io::BufRead::lines(reader);
 
     lines.map(|line| Ok(Command::from(line?)))
+}
+
+async fn create_connection(
+    args: &ClientArgs,
+) -> anyhow::Result<impl tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin> {
+    let conn = tokio::net::TcpStream::connect(args.common.server_address).await?;
+
+    #[cfg(feature = "mtls")]
+    let conn = {
+        let connector = create_connector(args)?;
+        let domain = rustls_pki_types::ServerName::try_from(args.mtls.cert_domain.clone())
+            .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid dnsname"))?
+            .to_owned();
+
+        connector.connect(domain, conn).await?
+    };
+
+    Ok(conn)
+}
+
+#[cfg(feature = "mtls")]
+fn create_connector(args: &ClientArgs) -> anyhow::Result<tokio_rustls::TlsConnector> {
+    let certs = common::tls::load_certs(&args.mtls.cert)?;
+    let priv_key = common::tls::load_keys(&args.mtls.key)?;
+    let roots_store = common::tls::load_root_certs(&args.mtls.ca_cert)?;
+
+    let config = rustls::ClientConfig::builder()
+        .with_root_certificates(roots_store)
+        .with_client_auth_cert(certs, priv_key)?;
+    let connector = tokio_rustls::TlsConnector::from(std::sync::Arc::new(config));
+
+    Ok(connector)
 }
