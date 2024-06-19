@@ -37,17 +37,27 @@ struct Server {
 #[derive(Debug)]
 struct Client {
     stream: tokio::net::TcpStream,
+    nickname: Option<String>,
 }
 
 impl Client {
     pub fn new(tcp_stream: tokio::net::TcpStream) -> Self {
         Self {
             stream: tcp_stream,
+            nickname: None,
         }
     }
 
     pub fn get_stream(&mut self) -> &mut tokio::net::TcpStream {
         &mut self.stream
+    }
+
+    pub fn set_nickname(&mut self, nickname: impl ToString) {
+        self.nickname = Some(nickname.to_string());
+    }
+
+    pub fn get_nickname(&self) -> Option<&str> {
+        self.nickname.as_deref()
     }
 }
 
@@ -102,7 +112,7 @@ impl Server {
         Ok(())
     }
 
-    #[tracing::instrument(skip(client, executor))]
+    #[tracing::instrument(skip(client, executor), fields(client = ?client.get_nickname()))]
     async fn client_tick(client: &mut Client, executor: &MessageExecutor) -> LoopInstruction {
         let response = match proto::Payload::read_from(client.get_stream()).await {
             Ok(payload) => match executor.exec(payload.into_inner(), client).await {
@@ -196,6 +206,10 @@ impl MessageExecutor {
             }
             Message::Text(msg) => {
                 tracing::info!("Message from: {msg}");
+            }
+            Message::AnnounceNickname(nickname) => {
+                client.set_nickname(&nickname);
+                tracing::info!("Client set nickname to {nickname}");
             }
         }
 
