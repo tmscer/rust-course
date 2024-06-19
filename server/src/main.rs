@@ -34,6 +34,30 @@ struct Server {
     clients: HashMap<net::SocketAddr, tokio::task::JoinHandle<anyhow::Result<()>>>,
 }
 
+#[derive(Debug)]
+struct Client {
+    stream: tokio::net::TcpStream,
+}
+
+impl Client {
+    pub fn new(tcp_stream: tokio::net::TcpStream) -> Self {
+        Self {
+            stream: tcp_stream,
+        }
+    }
+
+    pub fn get_stream(&mut self) -> &mut tokio::net::TcpStream {
+        &mut self.stream
+    }
+}
+
+#[derive(Default)]
+enum LoopInstruction {
+    #[default]
+    Continue,
+    Break,
+}
+
 impl Server {
     pub fn new(listener: tokio::net::TcpListener) -> Self {
         Self {
@@ -66,35 +90,41 @@ impl Server {
 
     #[tracing::instrument(skip(client_stream, executor), fields(client = %client_stream.peer_addr()?))]
     async fn handle_client(
-        mut client_stream: tokio::net::TcpStream,
+        client_stream: tokio::net::TcpStream,
         executor: &MessageExecutor,
     ) -> anyhow::Result<()> {
-        loop {
-            let response = match proto::Payload::read_from(&mut client_stream).await {
-                Ok(payload) => match executor
-                    .exec(payload.into_inner(), &mut client_stream)
-                    .await
-                {
-                    Ok(()) => proto::response::Message::Ok,
-                    Err(err) => {
-                        let msg = err.to_string();
-                        proto::response::Message::Err(proto::response::Error::message_exec(msg))
-                    }
-                },
-                Err(err) => {
-                    tracing::debug!("Failed to read message: {err}");
-                    proto::response::Error::Read(err.to_string()).into()
-                }
-            };
+        let mut client = Client::new(client_stream);
 
-            let payload = proto::Payload::new(&response);
-            if let Err(err) = payload.write_to(&mut client_stream).await {
-                tracing::debug!("Failed to send error response: {err}");
-                break;
-            }
+        while let LoopInstruction::Continue = Self::client_tick(&mut client, executor).await {
+            // Continue
         }
 
         Ok(())
+    }
+
+    #[tracing::instrument(skip(client, executor))]
+    async fn client_tick(client: &mut Client, executor: &MessageExecutor) -> LoopInstruction {
+        let response = match proto::Payload::read_from(client.get_stream()).await {
+            Ok(payload) => match executor.exec(payload.into_inner(), client).await {
+                Ok(()) => proto::response::Message::Ok,
+                Err(err) => {
+                    let msg = err.to_string();
+                    proto::response::Message::Err(proto::response::Error::message_exec(msg))
+                }
+            },
+            Err(err) => {
+                tracing::debug!("Failed to read message: {err}");
+                proto::response::Error::Read(err.to_string()).into()
+            }
+        };
+
+        let payload = proto::Payload::new(&response);
+        if let Err(err) = payload.write_to(&mut client.get_stream()).await {
+            tracing::debug!("Failed to send error response: {err}");
+            return LoopInstruction::Break;
+        }
+
+        LoopInstruction::Continue
     }
 
     async fn join_finished_clients(&mut self) -> anyhow::Result<()> {
@@ -135,7 +165,7 @@ impl MessageExecutor {
     pub async fn exec(
         &self,
         msg: common::proto::request::Message,
-        stream: &mut tokio::net::TcpStream,
+        client: &mut Client,
     ) -> anyhow::Result<()> {
         use common::proto::request::Message;
 
@@ -156,12 +186,12 @@ impl MessageExecutor {
             }
             Message::FileStream(filename, size) => {
                 let filepath = self.get_file_path(&filename).await?;
-                receive_streamed_file(&filepath, size, stream).await?;
+                receive_streamed_file(&filepath, size, client.get_stream()).await?;
                 log_file_receive(start, &filename, size as f64);
             }
             Message::ImageStream(filename, size) => {
                 let filepath = self.get_image_path(&filename).await?;
-                receive_streamed_file(&filepath, size, stream).await?;
+                receive_streamed_file(&filepath, size, client.get_stream()).await?;
                 log_file_receive(start, &filename, size as f64);
             }
             Message::Text(msg) => {
