@@ -13,6 +13,8 @@ pub enum Message {
     ImageStream(String, u64),
     /// Text message.
     Text(String),
+    /// Tell the server the client's nickname.
+    AnnounceNickname(String),
 }
 
 /// Represents a message client sends to server while streaming a file or image to it.

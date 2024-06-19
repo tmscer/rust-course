@@ -40,9 +40,10 @@ Options:
 Commands are read from stdin and sent to the server. They have the following syntax:
 
 ```
-.file <file-path>  # send file
-.image <file-path> # send image
-<anything else>    # send text message
+.file <file-path>    # send file
+.image <file-path>   # send image
+.nick <new-nickname> # announce nickname to the server
+<anything else>      # send text message
 ```
 
 ### Server

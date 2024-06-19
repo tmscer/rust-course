@@ -4,16 +4,27 @@ use clap::Parser;
 
 use common::proto;
 
+#[derive(Parser)]
+struct ClientArgs {
+    #[clap(short, long = "nick")]
+    nickname: String,
+    #[clap(flatten)]
+    common: common::cli::Args,
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     common::tracing::init()?;
 
-    let args = common::cli::Args::parse();
-    let mut conn = tokio::net::TcpStream::connect(args.server_address).await?;
+    let args = ClientArgs::parse();
+    let mut conn = tokio::net::TcpStream::connect(args.common.server_address).await?;
 
-    tracing::info!("Connected to {}", args.server_address);
+    tracing::info!("Connected to {}", args.common.server_address);
 
-    let iter_cmds = read_commands(io::stdin().lock());
+    let announce_nick_cmd = Command::AnnounceNickname(args.nickname);
+    // For some reason using `anyhow::Result::Ok(announce_nick_cmd)` doesn't work - Rust cannot infer the error type E.
+    let iter_cmds = std::iter::once(Result::<_, anyhow::Error>::Ok(announce_nick_cmd));
+    let iter_cmds = iter_cmds.chain(read_commands(io::stdin().lock()));
 
     for cmd in iter_cmds {
         match handle_command_should_exit(&mut conn, cmd).await {
@@ -98,6 +109,7 @@ async fn handle_command_should_exit(
             proto::request::Message::ImageStream(basename, file_size)
         }
         Command::Message(msg) => proto::request::Message::Text(msg),
+        Command::AnnounceNickname(nick) => proto::request::Message::AnnounceNickname(nick),
     };
 
     let mut bytes_sent = proto::Payload::new(message)
@@ -208,6 +220,7 @@ pub enum Command {
     File(path::PathBuf),
     Image(path::PathBuf),
     Message(String),
+    AnnounceNickname(String),
     Quit,
 }
 
@@ -228,6 +241,10 @@ where
 
         if let Some(suffix) = s.strip_prefix(".image ") {
             return Self::Image(path::PathBuf::from(suffix));
+        }
+
+        if let Some(nickname) = s.strip_prefix(".nick ") {
+            return Self::AnnounceNickname(nickname.to_string());
         }
 
         Self::Message(s.to_string())
