@@ -4,7 +4,10 @@ use crate::{Client, MessageExecutor};
 
 use super::Server;
 
-impl Server {
+impl<L> Server<L>
+where
+    L: Send,
+{
     #[tracing::instrument(skip(client, executor), fields(client = %client.get_address()))]
     pub async fn handle_client<S>(
         mut client: Client<S>,
