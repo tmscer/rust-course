@@ -4,10 +4,10 @@ use common::proto;
 
 use crate::Error;
 
-pub async fn send_stream_file(
-    conn: &mut tokio::net::TcpStream,
-    filepath: &path::Path,
-) -> Result<usize, Error> {
+pub async fn send_stream_file<S>(conn: &mut S, filepath: &path::Path) -> Result<usize, Error>
+where
+    S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
+{
     use tokio::io::AsyncReadExt;
 
     let mut reader = tokio::fs::File::open(&filepath)

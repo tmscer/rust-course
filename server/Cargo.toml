@@ -6,6 +6,7 @@ version = "0.1.0"
 [dependencies]
 common = {path = "../common"}
 
+async-trait = "0.1.80"
 diesel = {version = "2.1.6", features = ["postgres"]}
 diesel-async = {version = "0.4.1", features = ["postgres"]}
 
@@ -16,4 +17,13 @@ human_bytes = {workspace = true}
 thiserror = {workspace = true}
 tokio = {workspace = true}
 tracing = {workspace = true}
-async-trait = "0.1.80"
+
+rustls = {workspace = true, optional = true}
+rustls-pemfile = {workspace = true, optional = true}
+rustls-pki-types = {workspace = true, optional = true}
+tokio-rustls = {workspace = true, optional = true}
+
+[features]
+default = ["mtls"]
+
+mtls = ["rustls", "tokio-rustls", "rustls-pemfile", "rustls-pki-types", "common/tls"]

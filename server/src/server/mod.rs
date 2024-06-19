@@ -6,6 +6,11 @@ mod run;
 mod listener;
 pub use listener::Listener;
 
+#[cfg(feature = "mtls")]
+mod tls;
+#[cfg(feature = "mtls")]
+pub use tls::TlsListener;
+
 pub struct Server<L> {
     listener: L,
     clients: HashMap<net::SocketAddr, tokio::task::JoinHandle<anyhow::Result<()>>>,

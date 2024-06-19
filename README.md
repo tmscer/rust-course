@@ -26,6 +26,15 @@ running quickly. They're in directory `./ssl`.
 - `server-localhost.key` - Server private key
 - `server-localhost.bundle.crt` - Server certificate bundle (`cat server-localhost.crt ca.crt > server-localhost.bundle.crt`)
 
+To run without mTLS, disable default features using flag `--no-default-features` as mTLS is enabled by default via feature
+"mtls" in both `client` and `server`. Crate common has a feature named `tls`.
+
+> [!NOTE]
+>
+> I had problems switching between non-TLS and TLS at runtime using `Box<dyn _>`.
+> If you know how to do it without enum dispatch and implementing the required traits,
+> please let me know.
+
 ## Quick Start
 
 Spin up Postgres using `docker-compose up -d`.
@@ -40,16 +49,20 @@ and other utilities used by both `client` and `server`. See [./common/src/proto.
 Use `cargo run -- --help` to see usage:
 
 ```console
-Command-line arguments for both client and server. It contains only one argument - server address. Server uses it to bind to a specific address, while client uses it to connect to the server
+Command-line arguments for the client
 
-Usage: client --nick <NICKNAME> [SERVER_ADDRESS]
+Usage: client [OPTIONS] --nick <NICKNAME> [SERVER_ADDRESS]
 
 Arguments:
   [SERVER_ADDRESS]  Server address to bind to or connect to [default: 127.0.0.1:11111]
 
 Options:
-  -n, --nick <NICKNAME>
-  -h, --help             Print help
+  -n, --nick <NICKNAME>            
+      --cert-domain <CERT_DOMAIN>  Domain to require from the server [default: localhost]
+      --cert <CERT>                Path to the client's certificate [default: ../ssl/client1.crt]
+      --key <KEY>                  Path to the client's private key [default: ../ssl/client1.key]
+      --ca-cert <CA_CERT>          Path to the CA certificate [default: ../ssl/ca.crt]
+  -h, --help                       Print help
 ```
 
 Commands are read from stdin and sent to the server. They have the following syntax:
@@ -66,7 +79,7 @@ Commands are read from stdin and sent to the server. They have the following syn
 Use `cargo run -- --help` to see usage:
 
 ```console
-Command-line arguments for both client and server. It contains only one argument - server address. Server uses it to bind to a specific address, while client uses it to connect to the server
+Command-line arguments for the server
 
 Usage: server [OPTIONS] [SERVER_ADDRESS]
 
@@ -74,8 +87,11 @@ Arguments:
   [SERVER_ADDRESS]  Server address to bind to or connect to [default: 127.0.0.1:11111]
 
 Options:
-  -r, --root <ROOT>  [default: .]
-  -h, --help         Print help
+  -r, --root <ROOT>        [default: .]
+      --cert <CERT>        Path to the server's certificate [default: ../ssl/server-localhost.bundle.crt]
+      --key <KEY>          Path to the server's private key [default: ../ssl/server-localhost.key]
+      --ca-cert <CA_CERT>  Path to the CA certificate used for authenticating clients [default: ../ssl/ca.crt]
+  -h, --help               Print help
 ```
 
 Files are saved in `<root-dir>/files` and images are saved in `<root-dir>/images`.

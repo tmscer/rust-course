@@ -4,10 +4,13 @@ use common::proto;
 
 use crate::{send_stream_file, Command, Error};
 
-pub async fn handle_command_should_exit(
-    conn: &mut tokio::net::TcpStream,
+pub async fn handle_command_should_exit<S>(
+    conn: &mut S,
     cmd: anyhow::Result<Command>,
-) -> Result<bool, Error> {
+) -> Result<bool, Error>
+where
+    S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
+{
     let cmd = cmd.map_err(Error::hard)?;
 
     let mut file_to_send = Option::<path::PathBuf>::None;
