@@ -1,13 +1,18 @@
 use crate::{Client, MessageExecutor, Server};
 
-impl Server {
+use super::Listener;
+
+impl<L> Server<L>
+where
+    L: Listener + 'static,
+{
     pub async fn run(mut self, executor: MessageExecutor) -> anyhow::Result<()> {
         let executor = std::sync::Arc::new(executor);
 
         loop {
             self.join_finished_clients().await?;
 
-            let (client_stream, client_addr) = self.listener.accept().await?;
+            let (client_stream, client_addr) = self.listener.accept_conn().await?;
 
             let executor = executor.clone();
 

@@ -10,7 +10,7 @@ mod receive_file;
 pub(crate) use receive_file::receive_streamed_file;
 
 mod server;
-pub(crate) use server::{Client, Server};
+pub(crate) use server::{Client, Listener, Server};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

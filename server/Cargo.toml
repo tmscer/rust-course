@@ -16,3 +16,4 @@ human_bytes = {workspace = true}
 thiserror = {workspace = true}
 tokio = {workspace = true}
 tracing = {workspace = true}
+async-trait = "0.1.80"
