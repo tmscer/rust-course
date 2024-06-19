@@ -11,6 +11,21 @@ See individual crates
 
 for details.
 
+## Mutual TLS
+
+This repo contains self-signed certs (that are not used anywhere beside here) to get up and
+running quickly. They're in directory `./ssl`.
+
+- `ca.crt` - CA certificate
+- `ca.key` - CA private key
+- `client1.crt` - Client certificate
+- `client1.csr` - Client signing request
+- `client1.key` - Client private key
+- `server-localhost.crt` - Server certificate
+- `server-localhost.csr` - Server signing request
+- `server-localhost.key` - Server private key
+- `server-localhost.bundle.crt` - Server certificate bundle (`cat server-localhost.crt ca.crt > server-localhost.bundle.crt`)
+
 ## Quick Start
 
 Spin up Postgres using `docker-compose up -d`.
