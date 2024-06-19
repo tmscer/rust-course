@@ -25,13 +25,16 @@ and other utilities used by both `client` and `server`. See [./common/src/proto.
 Use `cargo run -- --help` to see usage:
 
 ```console
-Usage: client [SERVER_ADDRESS]
+Command-line arguments for both client and server. It contains only one argument - server address. Server uses it to bind to a specific address, while client uses it to connect to the server
+
+Usage: client --nick <NICKNAME> [SERVER_ADDRESS]
 
 Arguments:
-  [SERVER_ADDRESS]  [default: 127.0.0.1:11111]
+  [SERVER_ADDRESS]  Server address to bind to or connect to [default: 127.0.0.1:11111]
 
 Options:
-  -h, --help  Print help
+  -n, --nick <NICKNAME>
+  -h, --help             Print help
 ```
 
 Commands are read from stdin and sent to the server. They have the following syntax:
@@ -47,10 +50,12 @@ Commands are read from stdin and sent to the server. They have the following syn
 Use `cargo run -- --help` to see usage:
 
 ```console
+Command-line arguments for both client and server. It contains only one argument - server address. Server uses it to bind to a specific address, while client uses it to connect to the server
+
 Usage: server [OPTIONS] [SERVER_ADDRESS]
 
 Arguments:
-  [SERVER_ADDRESS]  [default: 127.0.0.1:11111]
+  [SERVER_ADDRESS]  Server address to bind to or connect to [default: 127.0.0.1:11111]
 
 Options:
   -r, --root <ROOT>  [default: .]
