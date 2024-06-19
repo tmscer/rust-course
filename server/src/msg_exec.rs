@@ -11,11 +11,14 @@ impl MessageExecutor {
         Self { root }
     }
 
-    pub async fn exec(
+    pub async fn exec<S>(
         &self,
         msg: common::proto::request::Message,
-        client: &mut Client,
-    ) -> anyhow::Result<()> {
+        client: &mut Client<S>,
+    ) -> anyhow::Result<()>
+    where
+        S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
+    {
         use common::proto::request::Message;
 
         tracing::debug!("Handling message");

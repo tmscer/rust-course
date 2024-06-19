@@ -3,10 +3,10 @@ use std::{cmp::Ordering, path};
 use common::proto;
 use tokio::io::AsyncWriteExt;
 
-pub async fn receive_streamed_file(
+pub async fn receive_streamed_file<S: tokio::io::AsyncReadExt + Unpin>(
     filepath: &path::PathBuf,
     expected: u64,
-    stream: &mut tokio::net::TcpStream,
+    stream: &mut S,
 ) -> Result<(), StreamFileError> {
     let mut file = tokio::fs::File::create(filepath)
         .await

@@ -1,17 +1,18 @@
 use common::proto;
 
-use crate::MessageExecutor;
+use crate::{Client, MessageExecutor};
 
-use super::{Client, Server};
+use super::Server;
 
 impl Server {
-    #[tracing::instrument(skip(client_stream, executor), fields(client = %client_stream.peer_addr()?))]
-    pub async fn handle_client(
-        client_stream: tokio::net::TcpStream,
+    #[tracing::instrument(skip(client, executor), fields(client = %client.get_address()))]
+    pub async fn handle_client<S>(
+        mut client: Client<S>,
         executor: &MessageExecutor,
-    ) -> anyhow::Result<()> {
-        let mut client = Client::new(client_stream);
-
+    ) -> anyhow::Result<()>
+    where
+        S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
+    {
         while let LoopInstruction::Continue = Self::client_tick(&mut client, executor).await {
             // Continue
         }
@@ -20,7 +21,10 @@ impl Server {
     }
 
     #[tracing::instrument(skip(client, executor), fields(client = ?client.get_nickname()))]
-    async fn client_tick(client: &mut Client, executor: &MessageExecutor) -> LoopInstruction {
+    async fn client_tick<S>(client: &mut Client<S>, executor: &MessageExecutor) -> LoopInstruction
+    where
+        S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
+    {
         let response = match proto::Payload::read_from(client.get_stream()).await {
             Ok(payload) => match executor.exec(payload.into_inner(), client).await {
                 Ok(()) => proto::response::Message::Ok,

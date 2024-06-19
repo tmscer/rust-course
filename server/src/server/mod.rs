@@ -18,20 +18,22 @@ impl Server {
 }
 
 #[derive(Debug)]
-pub(crate) struct Client {
-    stream: tokio::net::TcpStream,
+pub(crate) struct Client<S> {
+    address: net::SocketAddr,
+    stream: S,
     nickname: Option<String>,
 }
 
-impl Client {
-    pub fn new(tcp_stream: tokio::net::TcpStream) -> Self {
+impl<S> Client<S> {
+    pub fn new(address: net::SocketAddr, stream: S) -> Self {
         Self {
-            stream: tcp_stream,
+            address,
+            stream,
             nickname: None,
         }
     }
 
-    pub fn get_stream(&mut self) -> &mut tokio::net::TcpStream {
+    pub fn get_stream(&mut self) -> &mut S {
         &mut self.stream
     }
 
@@ -41,5 +43,9 @@ impl Client {
 
     pub fn get_nickname(&self) -> Option<&str> {
         self.nickname.as_deref()
+    }
+
+    pub fn get_address(&self) -> net::SocketAddr {
+        self.address
     }
 }

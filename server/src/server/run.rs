@@ -1,4 +1,4 @@
-use crate::{MessageExecutor, Server};
+use crate::{Client, MessageExecutor, Server};
 
 impl Server {
     pub async fn run(mut self, executor: MessageExecutor) -> anyhow::Result<()> {
@@ -13,7 +13,8 @@ impl Server {
 
             let handle = tokio::spawn(async move {
                 tracing::info!("Handling connection from {client_addr}");
-                Self::handle_client(client_stream, executor.as_ref()).await?;
+                let client = Client::new(client_addr, client_stream);
+                Self::handle_client(client, executor.as_ref()).await?;
                 tracing::info!("Closing connection to {client_addr}");
 
                 anyhow::Ok(())
