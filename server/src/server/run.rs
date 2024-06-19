@@ -12,7 +12,7 @@ where
         loop {
             self.join_finished_clients().await?;
 
-            let (client_stream, client_addr) = self.listener.accept_conn().await?;
+            let (client_stream, client_addr) = self.accept_conn().await;
 
             let executor = executor.clone();
 
@@ -26,6 +26,20 @@ where
             });
 
             self.clients.insert(client_addr, handle);
+        }
+    }
+
+    async fn accept_conn(&self) -> (L::Stream, std::net::SocketAddr) {
+        loop {
+            match self.listener.accept_conn().await {
+                Ok((stream, addr)) => {
+                    tracing::debug!("Accepted connection from {addr}");
+                    return (stream, addr);
+                }
+                Err(err) => {
+                    tracing::debug!("Error accepting connection: {err}");
+                }
+            }
         }
     }
 
