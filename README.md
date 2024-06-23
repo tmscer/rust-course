@@ -37,7 +37,13 @@ To run without mTLS, disable default features using flag `--no-default-features`
 
 ## Quick Start
 
-Spin up Postgres using `docker-compose up -d`.
+In directory `./server`, run command `make setup` to
+
+1. Start Postgres using docker-compose.
+2. Install [Diesel CLI](https://crates.io/crates/diesel_cli) via Cargo.
+3. Run DB migrations.
+
+For more info regarding DB, see [here](#Database).
 
 ### Common
 
@@ -94,10 +100,27 @@ Options:
   -h, --help               Print help
 ```
 
+Besides the arguments, env var `DATABASE_URL` with Postgres connection URL must be set.
+
 Files are saved in `<root-dir>/files` and images are saved in `<root-dir>/images`.
 Directories `<root-dir>/files` and `<root-dir>/images` are created if they don't exist.
 
 Server handles connection on the main thread and spawns a new thread for each client.
+
+### Database
+
+[`diesel`](https://crates.io/crates/diesel) and [`diesel_async`](https://crates.io/crates/diesel-async)
+are used for user-data persistence on the server. To work with it, see [their guide](https://diesel.rs/guides/getting-started).
+
+Regarding [`schema.rs`](./server/src/schema.rs):
+
+- Each message variant has its own table to simplify new variants in future. Common fields
+  are in one common table each table references.
+- File data is not saved to DB as FS is the natural choice here. DB remembers the file's SHA256
+  and path.
+- I had trouble convincing Diesel to reference `message_text(message_id) -> message(id)`
+  but it would generate `message_text(message_id) -> message(message_id)` so
+  I changed column names accordingly.
 
 ## Links
 
