@@ -4,11 +4,47 @@ use crate::{receive_streamed_file, Client};
 
 pub struct MessageExecutor {
     root: path::PathBuf,
+    on_execute: Option<tokio::sync::mpsc::Sender<ExecNotification>>,
+}
+
+#[derive(Debug)]
+pub struct ExecNotification {
+    pub client_nickname: Option<String>,
+    pub client_ip: std::net::IpAddr,
+    pub timestamp: chrono::DateTime<chrono::Utc>,
+    pub message: Message,
+}
+
+type Hash = sha2::Sha256;
+
+/// Shorted representation of [`common::proto::request::Message`] for notification purposes.
+#[derive(Debug)]
+pub enum Message {
+    /// Text message and its content.
+    Text(String),
+    /// File (and images) message, its filename and sha256 hash.
+    File {
+        filename: String,
+        filepath: String,
+        hash: Vec<u8>,
+        length: u64,
+    },
 }
 
 impl MessageExecutor {
     pub fn new(root: path::PathBuf) -> Self {
-        Self { root }
+        Self {
+            root,
+            on_execute: None,
+        }
+    }
+
+    pub fn with_notifications(
+        mut self,
+        on_execute: tokio::sync::mpsc::Sender<ExecNotification>,
+    ) -> Self {
+        self.on_execute = Some(on_execute);
+        self
     }
 
     pub async fn exec<S>(
@@ -19,40 +55,85 @@ impl MessageExecutor {
     where
         S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
     {
-        use common::proto::request::Message;
+        use common::proto::request;
 
         tracing::debug!("Handling message");
 
         let start = tokio::time::Instant::now();
 
-        match msg {
-            Message::File(filename, data) => {
+        let notification = match msg {
+            request::Message::File(filename, data) => {
                 let filepath = self.get_file_path(&filename).await?;
-                receive_file(&filepath, &data).await?;
+                let info = receive_file::<Hash>(&filepath, &data).await?;
                 log_file_receive(start, &filename, data.len() as f64);
+
+                Some(Message::File {
+                    filename,
+                    filepath: filepath.to_str().unwrap_or_default().to_string(),
+                    hash: info.hash,
+                    length: info.length,
+                })
             }
-            Message::Image(filename, data) => {
+            request::Message::Image(filename, data) => {
                 let filepath = self.get_image_path(&filename).await?;
-                receive_file(&filepath, &data).await?;
+                let info = receive_file::<Hash>(&filepath, &data).await?;
                 log_file_receive(start, &filename, data.len() as f64);
+
+                Some(Message::File {
+                    filename,
+                    filepath: filepath.to_str().unwrap_or_default().to_string(),
+                    hash: info.hash,
+                    length: info.length,
+                })
             }
-            Message::FileStream(filename, size) => {
+            request::Message::FileStream(filename, size) => {
                 let filepath = self.get_file_path(&filename).await?;
-                receive_streamed_file(&filepath, size, client.get_stream()).await?;
+                let info =
+                    receive_streamed_file::<Hash, _>(&filepath, size, client.get_stream()).await?;
                 log_file_receive(start, &filename, size as f64);
+
+                Some(Message::File {
+                    filename,
+                    filepath: filepath.to_str().unwrap_or_default().to_string(),
+                    hash: info.hash,
+                    length: info.length,
+                })
             }
-            Message::ImageStream(filename, size) => {
+            request::Message::ImageStream(filename, size) => {
                 let filepath = self.get_image_path(&filename).await?;
-                receive_streamed_file(&filepath, size, client.get_stream()).await?;
+                let info =
+                    receive_streamed_file::<Hash, _>(&filepath, size, client.get_stream()).await?;
                 log_file_receive(start, &filename, size as f64);
+
+                Some(Message::File {
+                    filename,
+                    filepath: filepath.to_str().unwrap_or_default().to_string(),
+                    hash: info.hash,
+                    length: info.length,
+                })
             }
-            Message::Text(msg) => {
+            request::Message::Text(msg) => {
                 tracing::info!("Message from: {msg}");
+
+                Some(Message::Text(msg))
             }
-            Message::AnnounceNickname(nickname) => {
+            request::Message::AnnounceNickname(nickname) => {
                 client.set_nickname(&nickname);
                 tracing::info!("Client set nickname to {nickname}");
+
+                None
             }
+        };
+
+        if let Some((notification, sender)) = notification.zip(self.on_execute.as_ref()) {
+            let notification = ExecNotification {
+                client_nickname: client.get_nickname().map(ToString::to_string),
+                client_ip: client.get_address().ip(),
+                timestamp: chrono::Utc::now(),
+                message: notification,
+            };
+
+            sender.send(notification).await?;
         }
 
         Ok(())
@@ -93,11 +174,28 @@ fn log_file_receive(start: tokio::time::Instant, filename: &str, filesize: f64) 
     );
 }
 
-async fn receive_file(filepath: &path::Path, data: &[u8]) -> anyhow::Result<()> {
+pub struct StreamInfo {
+    pub length: u64,
+    pub hash: Vec<u8>,
+}
+
+async fn receive_file<H: sha2::Digest>(
+    filepath: &path::Path,
+    data: &[u8],
+) -> anyhow::Result<StreamInfo> {
     use tokio::io::AsyncWriteExt;
 
     let mut file = tokio::fs::File::create(filepath).await?;
     file.write_all(data).await?;
 
-    Ok(())
+    let mut hasher = H::new();
+    hasher.update(data);
+
+    let hash = hasher.finalize().to_vec();
+    let info = StreamInfo {
+        length: data.len() as u64,
+        hash,
+    };
+
+    Ok(info)
 }

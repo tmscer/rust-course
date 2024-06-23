@@ -3,15 +3,19 @@ use std::{cmp::Ordering, path};
 use common::proto;
 use tokio::io::AsyncWriteExt;
 
-pub async fn receive_streamed_file<S: tokio::io::AsyncReadExt + Unpin>(
+use crate::msg_exec::StreamInfo;
+
+pub async fn receive_streamed_file<H: sha2::Digest, S: tokio::io::AsyncReadExt + Unpin>(
     filepath: &path::PathBuf,
     expected: u64,
     stream: &mut S,
-) -> Result<(), StreamFileError> {
+) -> Result<StreamInfo, StreamFileError> {
     let mut file = tokio::fs::File::create(filepath)
         .await
         .map_err(StreamFileError::fs)?;
     let mut received = 0;
+
+    let mut hasher = H::new();
 
     while received <= expected {
         match proto::Payload::read_from(stream)
@@ -21,6 +25,7 @@ pub async fn receive_streamed_file<S: tokio::io::AsyncReadExt + Unpin>(
             Ok(proto::request::StreamedFile::Payload(data)) => {
                 file.write_all(&data).await.map_err(StreamFileError::fs)?;
                 received += u64::try_from(data.len()).map_err(StreamFileError::read)?;
+                hasher.update(&data);
             }
             Ok(proto::request::StreamedFile::Abort) => {
                 if let Err(e) = tokio::fs::remove_file(filepath)
@@ -41,7 +46,13 @@ pub async fn receive_streamed_file<S: tokio::io::AsyncReadExt + Unpin>(
         }
     }
 
-    decide_streamed_file_result(received, expected)
+    let hash = hasher.finalize().to_vec();
+    let info = StreamInfo {
+        length: received,
+        hash,
+    };
+
+    decide_streamed_file_result(received, expected).map(|_| info)
 }
 
 fn decide_streamed_file_result(received: u64, expected: u64) -> Result<(), StreamFileError> {
