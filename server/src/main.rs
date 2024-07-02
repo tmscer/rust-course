@@ -118,6 +118,7 @@ async fn persist_to_db(
                     Message::File {
                         filename,
                         filepath,
+                        mime,
                         hash,
                         length,
                     } => {
@@ -125,6 +126,7 @@ async fn persist_to_db(
                             message_id: row_message.message_id,
                             filename,
                             filepath,
+                            mime,
                             length: length as i64,
                             hash: hex::encode(&hash),
                         };

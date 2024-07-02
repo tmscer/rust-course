@@ -26,6 +26,7 @@ pub enum Message {
     File {
         filename: String,
         filepath: String,
+        mime: Option<String>,
         hash: Vec<u8>,
         length: u64,
     },
@@ -70,6 +71,7 @@ impl MessageExecutor {
                 Some(Message::File {
                     filename,
                     filepath: filepath.to_str().unwrap_or_default().to_string(),
+                    mime: info.mime,
                     hash: info.hash,
                     length: info.length,
                 })
@@ -82,6 +84,7 @@ impl MessageExecutor {
                 Some(Message::File {
                     filename,
                     filepath: filepath.to_str().unwrap_or_default().to_string(),
+                    mime: info.mime,
                     hash: info.hash,
                     length: info.length,
                 })
@@ -95,6 +98,7 @@ impl MessageExecutor {
                 Some(Message::File {
                     filename,
                     filepath: filepath.to_str().unwrap_or_default().to_string(),
+                    mime: info.mime,
                     hash: info.hash,
                     length: info.length,
                 })
@@ -108,6 +112,7 @@ impl MessageExecutor {
                 Some(Message::File {
                     filename,
                     filepath: filepath.to_str().unwrap_or_default().to_string(),
+                    mime: info.mime,
                     hash: info.hash,
                     length: info.length,
                 })
@@ -177,6 +182,7 @@ fn log_file_receive(start: tokio::time::Instant, filename: &str, filesize: f64) 
 pub struct StreamInfo {
     pub length: u64,
     pub hash: Vec<u8>,
+    pub mime: Option<String>,
 }
 
 async fn receive_file<H: sha2::Digest>(
@@ -195,6 +201,7 @@ async fn receive_file<H: sha2::Digest>(
     let info = StreamInfo {
         length: data.len() as u64,
         hash,
+        mime: Some(tree_magic_mini::from_u8(data).to_string()),
     };
 
     Ok(info)

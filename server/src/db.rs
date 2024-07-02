@@ -27,6 +27,7 @@ pub struct NewMessageFile {
     pub message_id: i64,
     pub filename: String,
     pub filepath: String,
+    pub mime: Option<String>,
     pub length: i64,
     pub hash: String,
 }

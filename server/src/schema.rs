@@ -17,6 +17,7 @@ diesel::table! {
         filepath -> Varchar,
         length -> Int8,
         hash -> Varchar,
+        mime -> Nullable<Varchar>,
     }
 }
 

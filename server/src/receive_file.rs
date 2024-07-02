@@ -5,6 +5,9 @@ use tokio::io::AsyncWriteExt;
 
 use crate::msg_exec::StreamInfo;
 
+// 1024 was enough during experiments, this should be enough for (hopefully) all
+const MIME_DETECTION_BUFFER_SIZE: usize = 4096;
+
 pub async fn receive_streamed_file<H: sha2::Digest, S: tokio::io::AsyncReadExt + Unpin>(
     filepath: &path::PathBuf,
     expected: u64,
@@ -14,6 +17,10 @@ pub async fn receive_streamed_file<H: sha2::Digest, S: tokio::io::AsyncReadExt +
         .await
         .map_err(StreamFileError::fs)?;
     let mut received = 0;
+
+    let mut detection_buffer = [0u8; MIME_DETECTION_BUFFER_SIZE];
+    // is guaranteed not to be out of bounds
+    let mut bytes_in_detection_buffer = 0;
 
     let mut hasher = H::new();
 
@@ -25,7 +32,12 @@ pub async fn receive_streamed_file<H: sha2::Digest, S: tokio::io::AsyncReadExt +
             Ok(proto::request::StreamedFile::Payload(data)) => {
                 file.write_all(&data).await.map_err(StreamFileError::fs)?;
                 received += u64::try_from(data.len()).map_err(StreamFileError::read)?;
+
                 hasher.update(&data);
+                bytes_in_detection_buffer += copy_bytes(
+                    data.as_ref(),
+                    &mut detection_buffer[bytes_in_detection_buffer..],
+                );
             }
             Ok(proto::request::StreamedFile::Abort) => {
                 if let Err(e) = tokio::fs::remove_file(filepath)
@@ -47,9 +59,14 @@ pub async fn receive_streamed_file<H: sha2::Digest, S: tokio::io::AsyncReadExt +
     }
 
     let hash = hasher.finalize().to_vec();
+    let detection_buffer = &detection_buffer[..bytes_in_detection_buffer.min(received as usize)];
+
     let info = StreamInfo {
         length: received,
         hash,
+        // From `tree_magic_mini` docs:
+        // As the magic database files themselves are licensed under the GPL, you must make sure your project uses a compatible license if you enable this behaviour.
+        mime: Some(tree_magic_mini::from_u8(detection_buffer).to_string()),
     };
 
     decide_streamed_file_result(received, expected).map(|_| info)
@@ -102,6 +119,16 @@ impl From<StreamFileError> for proto::response::Error {
     }
 }
 
+// Copies from `src` to `dest` from index 0 as much as possible respecting length of both
+// to not cause an index out of bounds error. Returns the number of bytes copied.
+fn copy_bytes(src: &[u8], dest: &mut [u8]) -> usize {
+    let length = usize::min(src.len(), dest.len());
+
+    dest[..length].copy_from_slice(&src[..length]);
+
+    length
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -131,5 +158,16 @@ mod tests {
         let result = decide_streamed_file_result(received, expected);
 
         assert!(matches!(result, Err(StreamFileError::ExpectedLess { .. })));
+    }
+
+    #[test]
+    fn test_copy_bytes() {
+        let src = [1, 2, 3, 4, 5];
+        let mut dest = [0; 3];
+
+        let copied = copy_bytes(&src, &mut dest);
+
+        assert_eq!(copied, 3);
+        assert_eq!(dest, [1, 2, 3]);
     }
 }
