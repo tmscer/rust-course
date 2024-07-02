@@ -74,7 +74,10 @@ async fn persist_to_db(
     use diesel_async::AsyncPgConnection;
     use diesel_async::RunQueryDsl;
 
-    let mut conn = AsyncPgConnection::establish(db_url).await?;
+    let mut conn = AsyncPgConnection::establish(db_url)
+        .await
+        .map_err(|e| anyhow::Error::new(e).context("Failed to establish DB connection"))?;
+
     tracing::info!("Connected to database");
 
     while let Some(notification) = receiver.recv().await {
