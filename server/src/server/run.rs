@@ -6,13 +6,15 @@ impl<L> Server<L>
 where
     L: Listener + 'static,
 {
-    pub async fn run(mut self, executor: MessageExecutor) -> anyhow::Result<()> {
+    pub async fn run(&mut self, executor: MessageExecutor) -> anyhow::Result<()> {
         let executor = std::sync::Arc::new(executor);
 
         loop {
             self.join_finished_clients().await?;
 
-            let (client_stream, client_addr) = self.accept_conn().await;
+            let Some((client_stream, client_addr)) = self.accept_conn().await? else {
+                return Ok(());
+            };
 
             let executor = executor.clone();
 
@@ -29,12 +31,21 @@ where
         }
     }
 
-    async fn accept_conn(&self) -> (L::Stream, std::net::SocketAddr) {
+    async fn accept_conn(&mut self) -> anyhow::Result<Option<(L::Stream, std::net::SocketAddr)>> {
         loop {
-            match self.listener.accept_conn().await {
+            let accept = tokio::select! {
+                _ = tokio::signal::ctrl_c() => {
+                    tracing::info!("Received Ctrl+C, closing connections");
+                    self.close_connections().await?;
+                    return Ok(None);
+                }
+                accept = self.listener.accept_conn() => accept,
+            };
+
+            match accept {
                 Ok((stream, addr)) => {
                     tracing::debug!("Accepted connection from {addr}");
-                    return (stream, addr);
+                    return Ok(Some((stream, addr)));
                 }
                 Err(err) => {
                     tracing::debug!("Error accepting connection: {err}");
@@ -66,5 +77,13 @@ where
         }
 
         Ok(())
+    }
+
+    async fn close_connections(&mut self) -> anyhow::Result<()> {
+        for (_, handle) in self.clients.iter_mut() {
+            handle.abort();
+        }
+
+        self.join_finished_clients().await
     }
 }

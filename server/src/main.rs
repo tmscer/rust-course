@@ -31,7 +31,7 @@ async fn main() -> anyhow::Result<()> {
 
     tracing::info!("Listening on {}", args.common.server_address);
 
-    let server = Server::new(listener);
+    let mut server = Server::new(listener);
 
     let (sender, receiver) = tokio::sync::mpsc::channel(8);
     let executor = MessageExecutor::new(args.root).with_notifications(sender);
