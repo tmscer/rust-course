@@ -20,6 +20,8 @@ mod server;
 pub(crate) use server::TlsListener;
 pub(crate) use server::{Client, Server};
 
+mod web;
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     dotenvy::dotenv()?;
@@ -34,12 +36,18 @@ async fn main() -> anyhow::Result<()> {
     let mut server = Server::new(listener);
 
     let (sender, receiver) = tokio::sync::mpsc::channel(8);
-    let executor = MessageExecutor::new(args.root).with_notifications(sender);
+    let executor = MessageExecutor::new(args.root.clone()).with_notifications(sender);
 
     let db_url =
         std::env::var("DATABASE_URL").map_err(|_| anyhow::Error::msg("DATABASE_URL not set"))?;
 
-    try_join!(persist_to_db(&db_url, receiver), server.run(executor))?;
+    let repo = db::Repository::new(&db_url)?;
+
+    try_join!(
+        persist_to_db(&db_url, receiver),
+        server.run(executor),
+        web::run(&args, repo),
+    )?;
 
     Ok(())
 }

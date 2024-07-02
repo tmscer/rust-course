@@ -11,6 +11,10 @@ See individual crates
 
 for details.
 
+On the high-level, clients send messages and files to server using a custom protocol on one port (default `11111`)
+that can run over mTLS.
+Server exposes an unsecured (bring your own!) web interface on another port (default `8080`).
+
 ## Mutual TLS
 
 This repo contains self-signed certs (that are not used anywhere beside here) to get up and
@@ -93,11 +97,22 @@ Arguments:
   [SERVER_ADDRESS]  Server address to bind to or connect to [default: 127.0.0.1:11111]
 
 Options:
-  -r, --root <ROOT>        [default: .]
-      --cert <CERT>        Path to the server's certificate [default: ../ssl/server-localhost.bundle.crt]
-      --key <KEY>          Path to the server's private key [default: ../ssl/server-localhost.key]
-      --ca-cert <CA_CERT>  Path to the CA certificate used for authenticating clients [default: ../ssl/ca.crt]
-  -h, --help               Print help
+  -r, --root <ROOT>
+          [default: .]
+      --cert <CERT>
+          Path to the server's certificate [default: ../ssl/server-localhost.bundle.crt]
+      --key <KEY>
+          Path to the server's private key [default: ../ssl/server-localhost.key]
+      --ca-cert <CA_CERT>
+          Path to the CA certificate used for authenticating clients [default: ../ssl/ca.crt]
+      --web_address <WEB_ADDRESS>
+          [default: 127.0.0.1:8080]
+      --actix_num_workers <ACTIX_NUM_WORKERS>
+          [default: 2]
+      --disable-docs
+
+  -h, --help
+          Print help
 ```
 
 Besides the arguments, env var `DATABASE_URL` with Postgres connection URL must be set.

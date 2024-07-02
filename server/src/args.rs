@@ -1,7 +1,7 @@
 use std::path;
 
 /// Command-line arguments for the server.
-#[derive(clap::Parser)]
+#[derive(clap::Parser, Clone)]
 pub struct ServerArgs {
     #[clap(short, long, default_value = ".")]
     pub root: path::PathBuf,
@@ -11,10 +11,13 @@ pub struct ServerArgs {
     #[cfg(feature = "mtls")]
     #[clap(flatten)]
     pub mtls: MtlsArgs,
+
+    #[clap(flatten)]
+    pub web: crate::web::Config,
 }
 
 #[cfg(feature = "mtls")]
-#[derive(clap::Parser)]
+#[derive(clap::Parser, Clone)]
 pub struct MtlsArgs {
     /// Path to the server's certificate.
     #[clap(long, default_value = "../ssl/server-localhost.bundle.crt")]

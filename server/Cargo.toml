@@ -8,7 +8,7 @@ common = {path = "../common"}
 
 async-trait = "0.1.80"
 diesel = {version = "2.1.6", features = ["postgres", "chrono", "uuid"]}
-diesel-async = {version = "0.4.1", features = ["postgres"]}
+diesel-async = {version = "0.4.1", features = ["postgres", "deadpool"]}
 
 anyhow = {workspace = true}
 clap = {workspace = true}
@@ -18,15 +18,24 @@ thiserror = {workspace = true}
 tokio = {workspace = true}
 tracing = {workspace = true}
 
-chrono = "0.4.38"
+chrono = {version = "0.4.38", features = ["serde"]}
 dotenvy = "0.15.7"
 rustls = {workspace = true, optional = true}
 rustls-pemfile = {workspace = true, optional = true}
 rustls-pki-types = {workspace = true, optional = true}
 sha2 = "0.10.8"
 tokio-rustls = {workspace = true, optional = true}
-uuid = {version = "1.8.0", features = ["v4"]}
+uuid = {version = "1.8.0", features = ["v4", "serde"]}
 hex = "0.4.3"
+serde = {workspace=true}
+serde_json = "1"
+
+actix-web = "4.8.0"
+tera = "1"
+utoipa = {version = "4.2", features = ["debug", "actix_extras", "chrono", "time", "uuid", "url", "preserve_order", "preserve_path_order"]}
+utoipa-redoc = {version = "4.0.0", features = ["actix-web"]}
+utoipa-scalar = {version = "0.1.0", features = ["actix-web"]}
+async-stream = "0.3.5"
 tree_magic_mini = "3.1.5"
 
 [features]
