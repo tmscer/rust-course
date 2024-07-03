@@ -108,7 +108,7 @@ Options:
       --ca-cert <CA_CERT>
           Path to the CA certificate used for authenticating clients [default: ../ssl/ca.crt]
       --web_address <WEB_ADDRESS>
-          [default: 127.0.0.1:8080]
+          [default: 0.0.0.0:8080]
       --actix_num_workers <ACTIX_NUM_WORKERS>
           [default: 2]
       --disable-docs

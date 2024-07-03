@@ -1,7 +1,7 @@
 use std::net;
 
 pub const DEFAULT_WEB_SERVER_ADDRESS: net::SocketAddr =
-    net::SocketAddr::new(net::IpAddr::V4(net::Ipv4Addr::LOCALHOST), 8080);
+    net::SocketAddr::new(net::IpAddr::V4(net::Ipv4Addr::UNSPECIFIED), 8080);
 
 #[derive(clap::Parser, Debug, Clone)]
 pub struct Config {
