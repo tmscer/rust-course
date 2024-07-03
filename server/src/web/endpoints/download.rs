@@ -30,6 +30,7 @@ const FILE_ERROR: &str = "File not found or not accessible";
     ),
     operation_id = "download",
 )]
+#[tracing::instrument(skip(repo))]
 #[get("/download/{id}")]
 pub async fn handler(
     path: actix_web::web::Path<Uuid>,

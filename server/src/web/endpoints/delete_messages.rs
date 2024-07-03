@@ -17,6 +17,7 @@ use crate::web::Error;
         ),
     ),
 )]
+#[tracing::instrument(skip(repo))]
 #[post("/delete")]
 pub async fn handler(
     params: actix_web::web::Form<DeleteParams>,
@@ -45,7 +46,7 @@ pub async fn handler(
     .map_err(Error::internal)
 }
 
-#[derive(serde::Deserialize, utoipa::ToSchema)]
+#[derive(Debug, serde::Deserialize, utoipa::ToSchema)]
 #[serde(untagged)]
 pub enum DeleteParams {
     Specific {

@@ -17,6 +17,7 @@ use crate::web::Error;
     ),
     operation_id = "get_messages",
 )]
+#[tracing::instrument(skip(repo))]
 #[get("/")]
 pub async fn handler(
     query: actix_web::web::Query<SearchParams>,

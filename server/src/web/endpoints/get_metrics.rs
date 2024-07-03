@@ -27,6 +27,7 @@ use crate::web::Error;
     operation_id = "get_metrics",
 
 )]
+#[tracing::instrument]
 #[get("/metrics")]
 pub async fn handler() -> Result<impl actix_web::Responder, Error> {
     let encoder = prometheus::TextEncoder::new();

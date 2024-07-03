@@ -5,7 +5,7 @@ pub const DEFAULT_SERVER_ADDR: net::SocketAddr =
 
 /// Command-line arguments for both client and server. It contains only one argument - server address.
 /// Server uses it to bind to a specific address, while client uses it to connect to the server.
-#[derive(clap::Parser, Clone)]
+#[derive(clap::Parser, Debug, Clone)]
 pub struct Args {
     /// Server address to bind to or connect to.
     #[arg(index = 1, value_parser(parse_socket_addr), default_value_t = DEFAULT_SERVER_ADDR)]
