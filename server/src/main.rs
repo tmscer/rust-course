@@ -20,6 +20,8 @@ mod server;
 pub(crate) use server::TlsListener;
 pub(crate) use server::{Client, Server};
 
+/// Defines names of metrics according to conventions specified at <https://prometheus.io/docs/practices/naming/#metric-names>.
+mod metrics;
 mod web;
 
 #[tokio::main]
@@ -27,6 +29,8 @@ async fn main() -> anyhow::Result<()> {
     dotenvy::dotenv()?;
 
     common::tracing::init()?;
+
+    metrics::register(prometheus::default_registry())?;
 
     let args = ServerArgs::parse();
     let listener = get_listener(&args).await?;

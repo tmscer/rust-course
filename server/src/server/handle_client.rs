@@ -42,6 +42,8 @@ where
             }
         };
 
+        crate::metrics::MESSAGES_TOTAL.inc();
+
         let payload = proto::Payload::new(&response);
         if let Err(err) = payload.write_to(&mut client.get_stream()).await {
             tracing::debug!("Failed to send error response: {err}");

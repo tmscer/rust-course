@@ -31,8 +31,4 @@ diesel::table! {
 diesel::joinable!(message_file -> message (message_id));
 diesel::joinable!(message_text -> message (message_id));
 
-diesel::allow_tables_to_appear_in_same_query!(
-    message,
-    message_file,
-    message_text,
-);
+diesel::allow_tables_to_appear_in_same_query!(message, message_file, message_text,);

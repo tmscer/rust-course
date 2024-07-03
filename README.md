@@ -45,11 +45,19 @@ To run without mTLS, disable default features using flag `--no-default-features`
 
 In directory `./server`, run command `make setup` to
 
-1. Start Postgres using docker-compose.
+1. Start Postgres, Prometheus and Grafana using docker-compose.
 2. Install [Diesel CLI](https://crates.io/crates/diesel_cli) via Cargo.
 3. Run DB migrations.
 
 For more info regarding DB, see [here](#Database).
+
+### Prometheus Metrics
+
+Web server exposes text-encoded metrics at [`http://localhost:8080/metrics`](http://localhost:8080/metrics).
+They use the default registry provided by crate [`prometheus`](https://docs.rs/prometheus/0.13.4/prometheus/).
+
+- `http_requests_total`: Total number of HTTP requests over server's lifetime. Excludes metrics and docs requests.
+- `messages_total`: Total number of messages handled by server. File streaming messages are counted as one.
 
 ### Crate `common`
 

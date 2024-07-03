@@ -55,6 +55,7 @@ async fn spec_json_handler() -> impl actix_web::Responder {
         endpoints::get_messages::handler,
         endpoints::delete_messages::handler,
         endpoints::download::handler,
+        endpoints::get_metrics::handler,
     ),
     components(schemas(DeleteParams))
 )]

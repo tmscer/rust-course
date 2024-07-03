@@ -24,11 +24,21 @@ pub async fn run(args: &ServerArgs, repo: impl Repository) -> anyhow::Result<()>
         let mut app = actix_web::App::new()
             // TODO: Logging of each request
             .wrap(actix_web::middleware::Logger::default())
+            .wrap_fn(move |req, srv| {
+                use actix_web::dev::Service;
+
+                if req.path() != "/metrics" && !req.path().starts_with("/_docs") {
+                    crate::metrics::HTTP_REQUESTS_TOTAL.inc();
+                }
+
+                srv.call(req)
+            })
             .app_data(actix_web::web::Data::from(repo))
             .app_data(actix_web::web::Data::from(arc_args.clone()))
             .service(endpoints::get_messages::handler)
             .service(endpoints::download::handler)
-            .service(endpoints::delete_messages::handler);
+            .service(endpoints::delete_messages::handler)
+            .service(endpoints::get_metrics::handler);
 
         if !arc_args.web.disable_docs {
             const DOCS_PATH: &str = "/_docs";

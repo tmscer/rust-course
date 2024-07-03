@@ -5,6 +5,7 @@ use super::Repository;
 pub mod delete_messages;
 pub mod download;
 pub mod get_messages;
+pub mod get_metrics;
 
 pub async fn render_table(
     repo: &dyn Repository,
