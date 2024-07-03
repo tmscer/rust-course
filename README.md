@@ -60,6 +60,7 @@ They use the default registry provided by crate [`prometheus`](https://docs.rs/p
 - `messages_total`: Total number of messages handled by server. File streaming messages are counted as one.
 - `messages_received_bytes`: Total number of bytes received when handling messages.
 - `messages_sent_bytes`: Total number of bytes sent when handling messages.
+- `active_connections`: Number of active connections to the server.
 
 ### Crate `common`
 

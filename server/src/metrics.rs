@@ -23,6 +23,12 @@ lazy_static::lazy_static! {
             "Total number of bytes sent when handling messages.",
         )
     ).expect("a metric");
+    pub static ref ACTIVE_CONNECTIONS: prometheus::IntGauge = prometheus::IntGauge::with_opts(
+        prometheus::Opts::new(
+            "active_connections",
+            "Number of active connections to the server.",
+        )
+    ).expect("a metric");
 }
 
 pub fn register(registry: &prometheus::Registry) -> Result<(), prometheus::Error> {
@@ -30,6 +36,7 @@ pub fn register(registry: &prometheus::Registry) -> Result<(), prometheus::Error
     registry.register(Box::new(MESSAGES_TOTAL.clone()))?;
     registry.register(Box::new(MESSAGES_RECEIVED_BYTES.clone()))?;
     registry.register(Box::new(MESSAGES_SENT_BYTES.clone()))?;
+    registry.register(Box::new(ACTIVE_CONNECTIONS.clone()))?;
 
     Ok(())
 }
@@ -37,6 +44,7 @@ pub fn register(registry: &prometheus::Registry) -> Result<(), prometheus::Error
 /// A wrapper around a listener that meters the amount of data read and written on each accepted stream.
 pub struct MeteredListener<L> {
     inner: L,
+    active_connections: Option<prometheus::IntGauge>,
     read_metric: Option<prometheus::IntCounter>,
     write_metric: Option<prometheus::IntCounter>,
 }
@@ -45,9 +53,14 @@ impl<L> MeteredListener<L> {
     pub fn new(inner: L) -> Self {
         Self {
             inner,
+            active_connections: None,
             read_metric: None,
             write_metric: None,
         }
+    }
+
+    pub fn set_active_connections(&mut self, gauge: prometheus::IntGauge) {
+        self.active_connections = Some(gauge);
     }
 
     pub fn set_read_metric(&mut self, metric: prometheus::IntCounter) {
@@ -79,18 +92,23 @@ where
                 stream.set_write_metric(metric);
             }
 
+            if let Some(metric) = self.active_connections.clone() {
+                stream.set_active_metric(metric);
+            }
+
             (stream, addr)
         })
     }
 }
 
 /// A wrapper around a stream that meters the amount of data read and written.
-#[pin_project::pin_project]
+#[pin_project::pin_project(PinnedDrop)]
 pub struct MeteredStream<T> {
     #[pin]
     stream: T,
     read_metric: Option<prometheus::IntCounter>,
     write_metric: Option<prometheus::IntCounter>,
+    active_metric: Option<prometheus::IntGauge>,
 }
 
 impl<T> MeteredStream<T> {
@@ -99,6 +117,7 @@ impl<T> MeteredStream<T> {
             stream,
             read_metric: None,
             write_metric: None,
+            active_metric: None,
         }
     }
 
@@ -108,6 +127,20 @@ impl<T> MeteredStream<T> {
 
     pub fn set_write_metric(&mut self, metric: prometheus::IntCounter) {
         self.write_metric = Some(metric);
+    }
+
+    pub fn set_active_metric(&mut self, metric: prometheus::IntGauge) {
+        metric.inc();
+        self.active_metric = Some(metric);
+    }
+}
+
+#[pin_project::pinned_drop]
+impl<T> PinnedDrop for MeteredStream<T> {
+    fn drop(self: std::pin::Pin<&mut Self>) {
+        if let Some(ref metric) = self.active_metric {
+            metric.dec();
+        }
     }
 }
 
