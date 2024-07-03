@@ -58,6 +58,8 @@ They use the default registry provided by crate [`prometheus`](https://docs.rs/p
 
 - `http_requests_total`: Total number of HTTP requests over server's lifetime. Excludes metrics and docs requests.
 - `messages_total`: Total number of messages handled by server. File streaming messages are counted as one.
+- `messages_received_bytes`: Total number of bytes received when handling messages.
+- `messages_sent_bytes`: Total number of bytes sent when handling messages.
 
 ### Crate `common`
 

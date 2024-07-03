@@ -33,7 +33,9 @@ async fn main() -> anyhow::Result<()> {
     metrics::register(prometheus::default_registry())?;
 
     let args = ServerArgs::parse();
-    let listener = get_listener(&args).await?;
+    let mut listener = metrics::MeteredListener::new(get_listener(&args).await?);
+    listener.set_read_metric(crate::metrics::MESSAGES_RECEIVED_BYTES.clone());
+    listener.set_write_metric(crate::metrics::MESSAGES_SENT_BYTES.clone());
 
     tracing::info!("Listening on {}", args.common.server_address);
 
